@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "skills": {
+    "addresses": {
+      "source": "therealharpaljadeja/monskills",
+      "sourceType": "github",
+      "skillPath": "addresses/SKILL.md",
+      "computedHash": "519af4a9f1a3ca7975bfa4058deb4b749d9eb2caddec2142db61317412292a0c"
+    },
+    "concepts": {
+      "source": "therealharpaljadeja/monskills",
+      "sourceType": "github",
+      "skillPath": "concepts/SKILL.md",
+      "computedHash": "e0f3ec33522d84aa8dff0dc62e9d3b806a24505a1bb0148264866e3f29572cc3"
+    },
+    "gas": {
+      "source": "therealharpaljadeja/monskills",
+      "sourceType": "github",
+      "skillPath": "gas/SKILL.md",
+      "computedHash": "d5e029b79efd4e4ea8e81fcbd1ba365302c4b8d9a8d728ac031da8909ab6882a"
+    },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/impeccable/SKILL.md",
+      "computedHash": "dbbe3ac1a6285c2d2a18f39f56b2dee5b977e9566e2d0bba4347028ba90285bd"
+    },
+    "indexer": {
+      "source": "therealharpaljadeja/monskills",
+      "sourceType": "github",
+      "skillPath": "indexer/SKILL.md",
+      "computedHash": "ee109e2a6cfc69eaecb01a432083045366592db838c424d31f60f41ec2e60af9"
+    },
+    "monskill": {
+      "source": "therealharpaljadeja/monskills",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "8c71a4b0998f9fd6e677b927c13eec25fbd063b98c0f0ee09e6affae62bbfe8e"
+    },
+    "scaffold": {
+      "source": "therealharpaljadeja/monskills",
+      "sourceType": "github",
+      "skillPath": "scaffold/SKILL.md",
+      "computedHash": "3dcd58d1fd32c270ba59a677f6f4787ca83e9ee62318e49db7dc89eddc43872a"
+    },
+    "tooling-and-infra": {
+      "source": "therealharpaljadeja/monskills",
+      "sourceType": "github",
+      "skillPath": "tooling-and-infra/SKILL.md",
+      "computedHash": "6bc6b2106e6bea70b1a32f3d34a11bce46038e8bbc55e8e68d7a4c4698e7e79a"
+    },
+    "wallet": {
+      "source": "therealharpaljadeja/monskills",
+      "sourceType": "github",
+      "skillPath": "wallet/SKILL.md",
+      "computedHash": "7dcb8eed1250a6077e6bf61a525809ef954199f11dc64a3ef5dffb10f18ddb35"
+    },
+    "wallet-integration": {
+      "source": "therealharpaljadeja/monskills",
+      "sourceType": "github",
+      "skillPath": "wallet-integration/SKILL.md",
+      "computedHash": "de257b6c2655626b270b77e634cdd793209dad868c85023b7f524b857916fa1e"
+    },
+    "why-monad": {
+      "source": "therealharpaljadeja/monskills",
+      "sourceType": "github",
+      "skillPath": "why-monad/SKILL.md",
+      "computedHash": "d26a4660b735c0bb4014ce7b090e9372142d46838696d370015e0761f4ca07a7"
+    }
+  }
+}

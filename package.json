@@ -1,0 +1,19 @@
+{
+  "name": "nocap",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Onchain build-provenance protocol for Monad — your build, no cap.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @nocap/web",
+    "build:web": "npm run build -w @nocap/web",
+    "test:contracts": "cd contracts && forge test",
+    "cli": "npm run start -w @nocap/cli"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

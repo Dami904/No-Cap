@@ -1,0 +1,16 @@
+{
+  "chainId": 10143,
+  "network": "monad-testnet",
+  "rpc": "https://testnet-rpc.monad.xyz",
+  "deployer": "0xA600bf706366627c0AF9890A2B510A07e1F7D022",
+  "deploymentBlock": 45826583,
+  "registryDeploymentBlock": 46023808,
+  "contracts": {
+    "NoCapRegistry": "0x4931e958ac49919177E53e88DD4C7cE4D27a36E3",
+    "HackathonRegistry": "0xfA6A1648bdd63088b105ceFE5C150a09Ba0f5043",
+    "NoCapBadge": "0x6371375a18f7c810fa6313084FE98aD1b6326224"
+  },
+  "relayer": "0x550B5C45439Ebf11fd5B02AF8A970F5c4Ce9B17B",
+  "sparkHackathonId": "0x8c61c3081822adbadd1e72b08c1063e7248b1da8ed427e06e28bbb8208dc224d",
+  "note": "Addresses only — private keys live in gitignored .env. NoCapRegistry + NoCapBadge redeployed again for the hosted-relayer model (opt-in per-repo, admin-rotatable) and badge-mints-to-owner fix. HackathonRegistry untouched — it holds real windows other organizers seeded and must never be redeployed."
+}

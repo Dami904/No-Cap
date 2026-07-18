@@ -1,0 +1,17 @@
+# Compiler files
+cache/
+out/
+
+# Broadcast logs (contain tx metadata; keep local)
+broadcast/
+
+# Docs
+docs/
+
+# Dotenv / secrets
+.env
+.env.*
+!.env.example
+
+# Verify temp
+.verify-tmp/
