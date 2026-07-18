@@ -1,34 +1,84 @@
+<div align="center">
+
 # NoCap
 
 **your build, no cap.**
 
-Onchain build-provenance protocol for Monad. A GitHub Action anchors every commit fingerprint onchain so hackathon timelines are **verifiable**, not claimed.
+Onchain build-provenance for hackathons. A GitHub Action (or a hosted relayer) anchors
+every commit fingerprint to Monad, so a build's real timeline is **verifiable**, not
+claimed — and unlike a git timestamp, it can't be rewritten after the fact.
 
-Judges open a public timeline and see a green badge: *build started after registration opened.*
+[![License: MIT](https://img.shields.io/badge/license-MIT-6ee7b7)](#license)
+[![Chain: Monad Testnet](https://img.shields.io/badge/chain-Monad%20Testnet-6ee7b7)](https://testnet.monadexplorer.com)
+[![Built for: Monad Spark 2026](https://img.shields.io/badge/built%20for-Monad%20Spark%202026-6ee7b7)](#)
+
+[Live app](https://nocap-protocol.vercel.app) · [Contracts](#deployed-contracts--monad-testnet) · [Quick start](#quick-start) · [Setup guide](HOSTED_RELAYER_SETUP.md)
+
+</div>
 
 ---
 
-## What you get (end-to-end)
+## Why
+
+Spark's own judging rules check whether a submission "started before registration"
+and flag suspicious commits — using git timestamps, which are trivially rewritable
+(`git commit --date`, rebase, force-push) by the person being judged. GitHub is both
+the trusted witness *and* a party with full write access to its own history.
+
+NoCap replaces that with a witness nobody can quietly edit: once a commit SHA is
+anchored in a Monad block, "this exact commit existed at this block time" is fixed
+by consensus, not by the submitter's word. It's an upper-bound proof — it can't show
+code didn't exist earlier — but it makes the one thing judges actually check
+(*rewriting history to predate registration*) impossible, and every anchor is public
+and independently re-verifiable against the raw chain logs.
+
+```mermaid
+flowchart LR
+    A[Builder pushes a commit] --> B[GitHub Action / hosted relayer]
+    B -->|anchor repoId, sha, label| C[(NoCapRegistry — Monad)]
+    C --> D[/verify page — public timeline/]
+    C --> E[/hackathon board — judge triage/]
+    D --> F{Anchors inside<br/>the registered window?}
+    F -->|yes| G[✅ No Cap]
+    F -->|no| H[⛔ Cap?]
+```
+
+---
+
+## What ships
 
 | Role | Flow |
-|------|------|
-| **Organizer** | Deploy contracts → seed hackathon window → share judge board |
-| **Builder** | Register repo → add CI burner as contributor → push (auto-anchor) |
-| **Judge** | `/hackathon/spark-2026` board → `/verify/{owner}/{repoId}` timeline + anomalies |
+|---|---|
+| **Organizer** | `/organizer` → seed a hackathon window (permissionless, first-slug-wins) → share the judge board |
+| **Builder** | `/register` → connect GitHub, pick a repo, sign once → every push auto-anchors, zero secrets |
+| **Judge** | `/hackathons` → browse every live event → drill into `/verify/{owner}/{repoId}` for a timeline, anomaly flags, and a pass/fail badge |
 
-### Features shipped
+### Features
 
-- **NoCapRegistry** — register project (+ hackathonId), contributors, event-only anchors  
-- **HackathonRegistry** — reusable windows (Spark seeded at deploy)  
-- **NoCapBadge** — soulbound “Certified No Cap” NFT (optimistic claim)  
-- **GitHub Action** — auto-anchor on push + loud low-balance failure  
-- **CLI** — `nocap anchor` manual fallback  
-- **Web** — `/`, `/register`, `/verify`, `/dashboard`, `/hackathon`, `/badge`, `/embed`  
-- **Anomaly signals** — timing-only heuristics (not DQ)  
-- **Embed widget** — `apps/web/public/widget.js`, served at `/widget.js`  
-- **Forensic report API** — `GET /api/report/{owner}/{repoId}`  
+- **`NoCapRegistry`** — project registration, contributor authorization, event-only commit anchors
+- **`HackathonRegistry`** — permissionless, reusable time windows; any number of hackathons run concurrently
+- **`NoCapBadge`** — soulbound "Certified No Cap" NFT; optimistic claim, always mints to the repo's real owner
+- **Hosted relayer** — GitHub App + webhook auto-anchors every push with zero secrets in the builder's repo; opt-in per repo, admin-rotatable in one transaction, rate-limited and idempotent
+- **Self-hosted path** — GitHub Action + CLI fallback for builders who'd rather run their own burner
+- **Judge tooling** — live hackathon directory, per-event pulse stats, per-repo "build rhythm" analytics, timing-anomaly flags — all derived from onchain data, never from reading code
+- **Embed widget** — a drop-in badge (`/embed/{owner}/{repoId}`) for other platforms
+- **Forensic report API** — `GET /api/report/{owner}/{repoId}` — full JSON export of a project's timeline
 
-**Trust model:** default attester is a **per-repo CI burner key**, not the human author’s personal wallet. State that in every demo.
+**Trust model, stated plainly:** the default attester is a **per-repo CI key** (self-hosted burner or hosted relayer), not the human author's personal wallet. An anchor proves *"this repo's CI attested this SHA at this block time,"* not *"Alice personally signed this commit."* That's the right trust model for hackathon provenance — worth saying out loud in every demo, not leaving implicit.
+
+---
+
+## Deployed contracts — Monad testnet
+
+| Contract | Address |
+|---|---|
+| `NoCapRegistry` | [`0x4931e958ac49919177E53e88DD4C7cE4D27a36E3`](https://testnet.monadexplorer.com/address/0x4931e958ac49919177E53e88DD4C7cE4D27a36E3) |
+| `HackathonRegistry` | [`0xfA6A1648bdd63088b105ceFE5C150a09Ba0f5043`](https://testnet.monadexplorer.com/address/0xfA6A1648bdd63088b105ceFE5C150a09Ba0f5043) |
+| `NoCapBadge` | [`0x6371375a18f7c810fa6313084FE98aD1b6326224`](https://testnet.monadexplorer.com/address/0x6371375a18f7c810fa6313084FE98aD1b6326224) |
+
+Chain id `10143` · RPC `https://testnet-rpc.monad.xyz` · both `NoCapRegistry` and
+`NoCapBadge` are verified on Sourcify/MonadVision/MonadScan. Full deployment record
+in [`deployments/monad-testnet.json`](deployments/monad-testnet.json).
 
 ---
 
@@ -36,159 +86,108 @@ Judges open a public timeline and see a green badge: *build started after regist
 
 ```
 NoCap/
-  contracts/          # Foundry — NoCapRegistry, HackathonRegistry, NoCapBadge
-  packages/shared/    # computeRepoId + ABIs + window heuristics
-  packages/cli/       # nocap CLI
-  apps/web/           # Next.js frontend (public/widget.js = embed script)
-  .github/workflows/  # auto-anchor Action
-  PRODUCT.md
-  nocap-monad-build-plan.md
+  contracts/                Foundry — NoCapRegistry, HackathonRegistry, NoCapBadge
+  packages/shared/          computeRepoId, ABIs, window + timing analytics
+  packages/cli/             nocap CLI — manual/self-hosted anchoring
+  apps/web/                 Next.js app — frontend + hosted-relayer API routes
+  .github/workflows/        self-hosted auto-anchor Action
+  HOSTED_RELAYER_SETUP.md   GitHub App + deploy checklist
+  PRODUCT.md / DESIGN.md    brand + visual system
 ```
-
----
-
-## Phase map (all implemented)
-
-| Phase | Status |
-|-------|--------|
-| 0 Setup | Foundry + monorepo + PRODUCT.md |
-| 1 MVP | Registry, Action, `/` + `/verify`, window badge |
-| 2 Expansion | HackathonRegistry, multi-contributor, `/register`, `/dashboard`, CLI |
-| 2.5 Discovery | `/hackathon/[id]`, log cache, chunked RPC |
-| 3 Stretch | Embed widget, soulbound badge, anomalies, report API (x402-ready) |
-
----
-
-## Prerequisites (plan §1) — installed / documented
-
-| Skill | Status |
-|-------|--------|
-| **MONSKILLS** (`npx skills add therealharpaljadeja/monskills`) | Installed → canonical copy at `skills/monskill/`; mirrored per-harness (gitignored) at `.agents/`, `.claude/`, etc. |
-| Router | `AGENTS.md` points agents at monskill first |
-| Nested skills used | scaffold, wallet, gas, addresses, concepts, indexer, wallet-integration |
-| **Impeccable** | Installed → `skills/impeccable/`; `PRODUCT.md` + `DESIGN.md` are brand/visual source |
-| **Foundry** | `contracts/` with Monad testnet `chain_id=10143`, RPC in `foundry.toml` |
-| **`.monskills`** | `built-with=monskills` / `chain=monad-testnet` |
-
-Wallet UI: **injected wagmi** works out of the box. Full **Para** path needs you to `para login` (monskills forbids agents doing that for you) — see `apps/web/src/lib/wallet-note.md`.
-
-Indexer: live `eth_getLogs` for MVP; Envio scaffold notes in `indexer/README.md` after deploy+verify.
 
 ---
 
 ## Quick start
 
-### 0. Skills (if cloning fresh)
-
-```bash
-npx skills add therealharpaljadeja/monskills --all --copy
-# optional design gate
-npx impeccable install
-```
-
 ### 1. Contracts
 
 ```bash
-# Foundry on PATH
 cd contracts
-forge test
+forge test          # 19 tests
 ```
 
-Deploy to Monad testnet (account `nocap-deployer` funded from faucet):
+Deploy a fresh stack (or point at the addresses above and skip this):
 
 ```bash
-forge script script/Deploy.s.sol:Deploy --rpc-url https://testnet-rpc.monad.xyz --account nocap-deployer --broadcast
+forge script script/Deploy.s.sol:Deploy \
+  --rpc-url https://testnet-rpc.monad.xyz --account nocap-deployer --broadcast
 ```
 
-Verify (Sourcify):
-
-```bash
-forge verify-contract <address> NoCapRegistry --chain 10143 --verifier sourcify --verifier-url https://sourcify-api-monad.blockvision.org/
-```
-
-Record addresses → `apps/web/.env.local` (see `.env.example`).
-
-### 2. Web
+### 2. Web app
 
 ```bash
 npm install
-cp apps/web/.env.example apps/web/.env.local
-# fill addresses
+cp apps/web/.env.example apps/web/.env.local   # fill in addresses
 npm run dev
 ```
 
-Open http://localhost:3000
+Open **http://localhost:3000**.
 
-### 3. Register + anchor (builder path)
+### 3. Register a project
 
-**Hosted (default, zero secrets):** Connect wallet → **Register** → **Connect GitHub**
-→ pick your repo → sign once (`registerAndAuthorize`). A hosted relayer watches
-pushes via a GitHub webhook and anchors every commit automatically — no CI secrets,
-no workflow file. Requires the GitHub App to be set up first; see
-[`HOSTED_RELAYER_SETUP.md`](HOSTED_RELAYER_SETUP.md) for the one-time setup and what's
-already verified working on testnet.
+**Hosted (default, zero secrets):** connect a wallet → `/register` → **Connect
+GitHub** → pick your repo → sign once. A hosted relayer watches pushes via a GitHub
+webhook and anchors every commit automatically. Needs the GitHub App set up once —
+see [`HOSTED_RELAYER_SETUP.md`](HOSTED_RELAYER_SETUP.md) for the exact steps and
+what's already verified working live on testnet.
 
-**Self-hosted (DIY, always available):** on `/register`, click *"I'll run my own CI
-burner instead"*.
-1. Connect wallet → **Register** → enter `owner/repo`
-2. **Add contributor** = Action burner address
-3. Repo secrets: `NOCAP_PRIVATE_KEY`, `NOCAP_REGISTRY`
-4. Push → Action anchors → open `/verify/{yourAddress}/{repoId}`
+**Self-hosted (always available):** on `/register`, choose *"I'll run my own CI
+burner instead"* → add `NOCAP_PRIVATE_KEY` + `NOCAP_REGISTRY` as repo secrets →
+authorize that burner as a contributor → push. The existing
+`.github/workflows/nocap-anchor.yml` fires automatically.
 
-### 4. CLI fallback
+**CLI fallback** (no GitHub Action needed):
 
 ```bash
 cd packages/cli && npm install
 export NOCAP_PRIVATE_KEY=0x...
-export NOCAP_REGISTRY=0x...
+export NOCAP_REGISTRY=0x4931e958ac49919177E53e88DD4C7cE4D27a36E3
 npx tsx src/index.ts anchor --repo you/repo --sha <fullsha> --message "ship it"
 ```
 
 ---
 
-## Canonical `repoId`
+## How it fits together
 
-**One helper everywhere** (`packages/shared`):
-
-```ts
-repoId = keccak256(utf8(lowercase("owner/repo")))
-```
-
-No `https://`, no trailing slash. Mismatch = empty verify page forever.
-
----
-
-## Spark window (seeded)
-
-- Start: `1783947600` — 2026-07-13 13:00 UTC  
-- End: `1784505599` — 2026-07-19 23:59:59 UTC  
-- Id string: `spark-2026` → `keccak256("spark-2026")`
-
-Re-check against the live hackathon page before submission.
+- **Canonical `repoId`** — one helper, everywhere: `keccak256(utf8(lowercase("owner/repo")))`, no `https://` prefix, no trailing slash. A mismatch between the Action, the CLI, and the frontend means an empty verify page with no obvious cause, so `packages/shared` is the single source of truth every caller imports.
+- **Multi-hackathon by default** — a repo registers under one `hackathonId`; boards, verify pages, and badge eligibility all scope to that project's own window. Any number of events run concurrently without colliding.
+- **Anomaly signals are advisory, never a verdict** — timing heuristics (late bursts, compressed spans, pre-window anchors) are surfaced on `/verify` and never auto-disqualify anything.
+- **Badge is an optimistic, publicly-checkable claim** — `claimBadge` is permissionless and always mints to the repo's registered owner (never the caller), so anyone — including the hosted relayer — can trigger it once eligible without risk of stealing someone else's badge.
 
 ---
 
 ## Security rails
 
-- Burner wallet only for Action/deployer — never reuse  
-- Key only in GitHub Secrets / env — never frontend  
-- `anchor` gated by `isContributor`  
-- No source code / PII onchain — hashes + short labels only  
-- Badge eligibility is **optimistic + publicly checkable**, not fully trustless re-derivation  
+- Burner/relayer wallets only — never a funded personal wallet, never reused across purposes
+- Private keys live only in GitHub Secrets or server-side env vars — never in frontend code, never committed
+- `anchor()` gated by `isContributor` (self-hosted) or a per-repo opt-in `relayerEnabled` flag (hosted) — a compromised relayer key can only touch repos that explicitly opted in, never every project on the registry
+- Relayer key is admin-rotatable — one transaction re-authorizes every opted-in repo, no per-project migration
+- No source code, no file contents, no PII ever touches the chain — only hashes and short labels
 
 ---
 
-## Demo video script (&lt; 3 min)
+## Roadmap (all phases shipped)
 
-1. Register project on UI  
-2. Add CI address as contributor  
-3. Push a commit on camera  
-4. Show Action green  
-5. Open `/verify` — timeline updates  
-6. Point at green **No Cap** badge  
-7. Flash judge board  
+| Phase | Status |
+|---|---|
+| 0 · Setup | Foundry + monorepo scaffolding |
+| 1 · MVP | Registry, Action, landing + verify page, window badge |
+| 2 · Expansion | HackathonRegistry, multi-contributor, register/dashboard, CLI |
+| 2.5 · Discovery | Hackathon directory, chunked log scanning, per-event stats |
+| 3 · Stretch | Embed widget, soulbound badge, anomaly flags, forensic report API |
+| 4 · Hosted relayer | GitHub App, webhook auto-anchor, one-signature registration |
 
-Post line: *I built a tool that proves hackathon submissions aren’t backdated, then used it to prove this one isn’t — no cap.*
+---
+
+## Demo script (&lt; 3 min)
+
+1. Register a project — connect GitHub, pick the repo, sign once
+2. Push a commit on camera
+3. Show the anchor land — open `/verify`, watch the timeline update
+4. Point at the green **No Cap** badge
+5. Flash the judge board across a couple of live hackathons
+
+*I built a tool that proves hackathon submissions aren't backdated, then used it to prove this one isn't — no cap.*
 
 ---
 

@@ -1,9 +1,10 @@
 # Hosted relayer — remaining setup
 
 Everything code-side is built and, where testable without external accounts, proven
-working on Monad testnet (see "What's already verified" below). Two things remain
-that only a human with a GitHub account and a hosting decision can do — nothing here
-can be automated away.
+working on Monad testnet (see "What's already verified" below). **The app is live**
+at **https://nocap-protocol.vercel.app** — deployed, public (no auth gate), all
+contract-address env vars set. One thing remains that only a human with a GitHub
+account can do — nothing here can be automated away.
 
 ## 1. Register the GitHub App
 
@@ -14,10 +15,10 @@ created by an agent — it requires your GitHub login in a browser.
 2. Fill in:
    - **GitHub App name**: anything unique, e.g. `nocap-provenance` — this becomes
      `NEXT_PUBLIC_GITHUB_APP_SLUG`.
-   - **Homepage URL**: your deployed app's URL (see step 2 below).
-   - **Setup URL**: `https://<your-domain>/api/github/install/callback`
+   - **Homepage URL**: `https://nocap-protocol.vercel.app`
+   - **Setup URL**: `https://nocap-protocol.vercel.app/api/github/install/callback`
      — check **"Redirect on update"** too, so re-installs also hit the callback.
-   - **Webhook URL**: `https://<your-domain>/api/github/webhook`
+   - **Webhook URL**: `https://nocap-protocol.vercel.app/api/github/webhook`
    - **Webhook secret**: generate a strong random value (e.g. `openssl rand -hex 32`)
      — this exact string goes in **two** places and must match byte-for-byte:
      the GitHub App's webhook secret field, and `GITHUB_WEBHOOK_SECRET` in your
@@ -35,20 +36,22 @@ created by an agent — it requires your GitHub login in a browser.
      env var — if your hosting platform's env var UI collapses newlines, replace
      real newlines with literal `\n`; `lib/githubApp.ts` already normalizes both forms.
 
-## 2. Deploy the app publicly
+## 2. Deployment — done
 
-GitHub's webhook servers can't reach `localhost` — this needs a real HTTPS URL
-before step 1's Webhook URL / Setup URL will resolve.
+Live at **https://nocap-protocol.vercel.app** (Vercel project `nocap`, linked from
+the monorepo root with Root Directory set to `apps/web` — the shared `packages/`
+workspace needs to ship with the upload, so linking from inside `apps/web` alone
+breaks the build with `Module not found: Can't resolve '@nocap/shared'`; that's
+already handled, just noted in case you ever re-link the project). Deployment
+protection (Vercel's default SSO gate) is disabled — the app needs to be reachable
+by GitHub's webhook servers and by judges with no Vercel login.
 
-1. Deploy `apps/web` (Vercel is the path of least resistance for a Next.js app —
-   connect the repo, set the root directory to `apps/web`).
-2. Set every env var from `apps/web/.env.local` in the hosting platform's env
-   settings — **all of them**, including the server-only ones
-   (`NOCAP_RELAYER_PRIVATE_KEY`, `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`,
-   `GITHUB_WEBHOOK_SECRET`). Never commit `.env.local` — it's gitignored on purpose.
-3. Once deployed, go back to the GitHub App settings and fill in the real Setup URL
-   / Webhook URL from step 1 (you likely put placeholders in during creation).
-4. **Known gap to be aware of**: `lib/relayerStore.ts` and `lib/installationStore.ts`
+Public env vars and `NOCAP_RELAYER_PRIVATE_KEY` are already set in the Vercel
+project. Once you register the GitHub App above, add the three remaining vars —
+`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` — via `vercel env
+add <name> production`, then `vercel --prod` to pick them up.
+
+**Known gap to be aware of**: `lib/relayerStore.ts` and `lib/installationStore.ts`
    are in-memory by design (see the comment in each file) — they reset on every
    cold start / redeploy / multi-instance scale-out. On a single always-warm
    instance this is fine; on a platform that spins down idle instances (Vercel's
@@ -86,8 +89,9 @@ Already done for the current deployment — flagging what to repeat if you rotat
 - `/register` already renders correctly in the "GitHub not connected yet" state and
   falls back cleanly to the self-hosted CI path — confirmed by screenshot.
 
-## What's still unverified (blocked on steps 1–2 above)
+## What's still unverified (blocked on step 1 above)
 
 - The actual "Connect GitHub" → install → repo picker flow, end to end with a real
-  GitHub App. The code is complete and typechecked but has never run against a real
-  App ID/private key, since none exists yet.
+  GitHub App. The code is complete, typechecked, and already deployed at
+  https://nocap-protocol.vercel.app, but has never run against a real App ID/private
+  key, since no GitHub App exists yet.

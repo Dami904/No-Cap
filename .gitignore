@@ -85,3 +85,6 @@ packages/shared/node_modules/
 data/
 agent/
 
+
+.vercel
+.env*
