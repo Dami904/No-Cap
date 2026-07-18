@@ -14,6 +14,7 @@ import { ADDRESSES } from "@/lib/config";
 import { fetchAllWindows, type HackathonListing } from "@/lib/indexer";
 import { formatTs } from "@/lib/format";
 import { ConnectButton } from "@/components/ConnectButton";
+import { RepoPicker, type InstalledRepo } from "@/components/RepoPicker";
 
 function windowStatus(w: HackathonListing, now: number): "live" | "upcoming" | "ended" {
   if (now < w.startTime) return "upcoming";
@@ -25,8 +26,6 @@ const GITHUB_APP_SLUG = process.env.NEXT_PUBLIC_GITHUB_APP_SLUG ?? "";
 const installUrl = GITHUB_APP_SLUG
   ? `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`
   : null;
-
-type InstalledRepo = { fullName: string; private: boolean };
 
 export default function RegisterPage() {
   return (
@@ -44,6 +43,7 @@ function RegisterPageInner() {
   const [ghRepos, setGhRepos] = useState<InstalledRepo[] | null>(null);
   const [ghConnected, setGhConnected] = useState(false);
   const [ghLoading, setGhLoading] = useState(true);
+  const [ghError, setGhError] = useState<string | null>(null);
 
   const [repo, setRepo] = useState("");
   const [manualMode, setManualMode] = useState(false);
@@ -60,18 +60,33 @@ function RegisterPageInner() {
 
   useEffect(() => {
     fetch("/api/github/installations/repos")
-      .then((r) => r.json())
-      .then((data: { connected: boolean; repos: InstalledRepo[] }) => {
+      .then(async (r) => ({ status: r.status, data: await r.json() }))
+      .then(({ status, data }: { status: number; data: { connected: boolean; repos: InstalledRepo[]; error?: string } }) => {
         setGhConnected(data.connected);
         setGhRepos(data.repos);
         if (data.repos.length === 1) setRepo(data.repos[0]!.fullName);
+        if (status !== 200 && data.error) setGhError(data.error);
+        else if (data.connected && data.repos.length === 0) {
+          setGhError(
+            "Connected, but GitHub returned zero repos. This usually means the app was installed with access limited to specific repos, and the one you want wasn't selected — go to github.com/settings/installations → nocap-provenance → Configure, and add it."
+          );
+        }
       })
       .catch(() => {
         setGhConnected(false);
         setGhRepos([]);
+        setGhError("Couldn't reach the installations API — try refreshing.");
       })
       .finally(() => setGhLoading(false));
   }, []);
+
+  async function disconnectGithub() {
+    await fetch("/api/github/disconnect", { method: "POST" }).catch(() => {});
+    setGhConnected(false);
+    setGhRepos([]);
+    setGhError(null);
+    setRepo("");
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -190,9 +205,28 @@ function RegisterPageInner() {
                     {ghLoading ? (
                       <p className="muted">Checking GitHub connection…</p>
                     ) : ghConnected && ghRepos && ghRepos.length > 0 ? (
-                      <div className="success-box">
-                        GitHub connected — {ghRepos.length} repo
-                        {ghRepos.length === 1 ? "" : "s"} available.
+                      <div
+                        className="success-box"
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "0.5rem",
+                        }}
+                      >
+                        <span>
+                          GitHub connected — {ghRepos.length} repo
+                          {ghRepos.length === 1 ? "" : "s"} available.
+                        </span>
+                        <button
+                          type="button"
+                          className="btn"
+                          style={{ fontSize: "0.78rem", padding: "0.4rem 0.75rem" }}
+                          onClick={disconnectGithub}
+                        >
+                          Disconnect
+                        </button>
                       </div>
                     ) : (
                       <div className="card" style={{ textAlign: "center" }}>
@@ -211,6 +245,7 @@ function RegisterPageInner() {
                         )}
                       </div>
                     )}
+                    {ghError && <div className="error-box">{ghError}</div>}
                   </div>
                 )}
 
@@ -218,17 +253,7 @@ function RegisterPageInner() {
                   {usingHostedRelayer && ghRepos && ghRepos.length > 0 ? (
                     <label className="field">
                       Repo
-                      <select value={repo} onChange={(e) => setRepo(e.target.value)} required>
-                        <option value="" disabled>
-                          Select a repo…
-                        </option>
-                        {ghRepos.map((r) => (
-                          <option key={r.fullName} value={r.fullName}>
-                            {r.fullName}
-                            {r.private ? " (private)" : ""}
-                          </option>
-                        ))}
-                      </select>
+                      <RepoPicker repos={ghRepos} value={repo} onChange={setRepo} />
                     </label>
                   ) : (
                     <>

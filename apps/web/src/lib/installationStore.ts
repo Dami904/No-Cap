@@ -8,6 +8,7 @@
 export interface InstallationStore {
   saveInstallation(sessionToken: string, installationId: number): Promise<void>;
   getInstallation(sessionToken: string): Promise<number | null>;
+  clearInstallation(sessionToken: string): Promise<void>;
 }
 
 class InMemoryInstallationStore implements InstallationStore {
@@ -19,6 +20,10 @@ class InMemoryInstallationStore implements InstallationStore {
 
   async getInstallation(sessionToken: string): Promise<number | null> {
     return this.map.get(sessionToken) ?? null;
+  }
+
+  async clearInstallation(sessionToken: string): Promise<void> {
+    this.map.delete(sessionToken);
   }
 }
 
