@@ -1,23 +1,35 @@
-## Envio Indexer
+# NoCap indexer — Envio HyperIndex
 
-*Please refer to the [documentation website](https://docs.envio.dev) for a thorough guide on all [Envio](https://envio.dev) indexer features*
+Ingests `NoCapRegistry` and `HackathonRegistry` events on Monad testnet into a
+GraphQL database, so the web app reads indexed data instead of scanning
+`eth_getLogs` on every page load — instant lists, no RPC rate limits, no provider
+token in the browser.
 
-### Run
+## Entities
+
+| Entity | Source event | Keyed by |
+|---|---|---|
+| `Anchor` | `NoCapRegistry.Anchored` | `chainId_block_logIndex` |
+| `Project` | `NoCapRegistry.ProjectRegistered` | `repoId` |
+| `HackathonWindow` | `HackathonRegistry.WindowRegistered` | `hackathonId` (upserted, latest wins) |
+
+Addresses are lowercased on ingest so GraphQL equality filters match a checksummed
+address from a wallet. Schema in [`schema.graphql`](schema.graphql), config (chains,
+contracts, start block, tx-hash field selection) in [`config.yaml`](config.yaml),
+handlers in [`src/handlers/`](src/handlers).
+
+## Develop
 
 ```bash
-pnpm dev
+pnpm install
+pnpm codegen        # after any schema.graphql / config.yaml change
+pnpm tsc --noEmit   # after any handler change
 ```
 
-Visit http://localhost:8080 to see the GraphQL Playground, local password is `testing`.
+Requires Node 22. On Windows, run inside WSL — the Envio CLI ships no native
+Windows binary.
 
-### Generate files from `config.yaml` or `schema.graphql`
+## Deploy
 
-```bash
-pnpm codegen
-```
-
-### Pre-requisites
-
-- [Node.js v22+ (v24 recommended)](https://nodejs.org/en/download/current)
-- [pnpm (use v8 or newer)](https://pnpm.io/installation)
-- [Docker](https://www.docker.com/products/docker-desktop/) or [Podman](https://podman.io/)
+See [`DEPLOY.md`](DEPLOY.md). Once deployed, set `NEXT_PUBLIC_INDEXER_URL` in the web
+app to the GraphQL endpoint.
