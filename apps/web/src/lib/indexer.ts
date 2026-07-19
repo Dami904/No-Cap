@@ -32,21 +32,35 @@ function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
   });
 }
 
-// Monad's public testnet RPC hard-caps eth_getLogs at a 100-block range
-// (confirmed via its own error: "eth_getLogs is limited to a 100 range").
-// A provisioned RPC provider (Phase 2.5, tooling-and-infra/) may allow larger
-// windows — this stays conservative so the default public endpoint always works.
-const CHUNK = 100n;
-// Monad produces a block every ~400ms (concepts/), so even a few hours of chain
-// history is tens of thousands of blocks — at a 100-block RPC cap that's hundreds
-// of round trips. Empirically the public endpoint serves ~20 concurrent
-// eth_getLogs cleanly but starts erroring past that (which then compounds via
-// retries), so this stays moderate rather than maximal. A provisioned RPC or a
-// real cache/indexer (Phase 2.5, tooling-and-infra/ + indexer/) is the real fix
-// once query volume grows — this just keeps the public-RPC path from hanging.
-const PARALLEL = 15;
+// Adaptive range scanning: try the full requested range in one call first, and
+// only split into smaller windows when the RPC actually rejects it. This is
+// near-instant on a provider that can span huge ranges in one shot when scoped
+// to a single contract address (Envio's HyperRPC verified to cover this app's
+// entire chain history in ~200ms), and still safely degrades on a hard-capped
+// RPC (Monad's public endpoint hard-caps eth_getLogs at 100 blocks).
+//
+// Two failure modes need OPPOSITE responses, and conflating them is a real bug
+// this scanner hit twice: a hard range-limit error (e.g. "limited to a 100
+// range") means the request can never succeed as-is, so splitting is correct.
+// A rate-limit error (e.g. HyperRPC's 429 under concurrent load — confirmed:
+// 11 of 15 simultaneous requests got 429'd in testing) means the request is
+// fine, just throttled — splitting it makes things WORSE, doubling requests
+// against the same limit and amplifying into a retry storm. So every failure
+// retries on the SAME range first; only after retries are exhausted does it
+// fall back to splitting, which naturally routes rate limits to backoff+retry
+// (resolves without ever splitting) and genuine range errors to split (every
+// retry of an oversized range fails identically and fast, so the wasted
+// retries cost little before falling through).
+//
+// A bounded-concurrency work queue caps how many requests are ever in flight,
+// so — regardless of provider or failure mode — this can't runaway into an
+// unthrottled fan-out (the original version of this bug: naive recursive
+// Promise.all bisection over a 100-block cap on tens of thousands of blocks
+// meant hundreds of thousands of concurrent requests fired at once).
+const PARALLEL = 5;
+const MAX_RETRIES = 3;
 
-async function getLogsRange(
+async function getLogsOne(
   params: {
     address: Address;
     event: (typeof noCapRegistryAbi)[number];
@@ -55,33 +69,27 @@ async function getLogsRange(
   from: bigint,
   to: bigint,
   attempt = 0
-): Promise<Log[]> {
+): Promise<{ logs: Log[]; splitInto?: [bigint, bigint][] }> {
   const client = getScanClient();
   try {
-    return (await client.getLogs({
+    const logs = (await client.getLogs({
       address: params.address,
       event: params.event as never,
       args: params.args as never,
       fromBlock: from,
       toBlock: to,
     })) as Log[];
+    return { logs };
   } catch {
-    // A range wider than the RPC's cap is a real limit error — split it.
-    if (to - from > CHUNK) {
+    if (attempt < MAX_RETRIES) {
+      await new Promise((r) => setTimeout(r, 250 * 2 ** attempt));
+      return getLogsOne(params, from, to, attempt + 1);
+    }
+    if (to > from) {
       const mid = from + (to - from) / 2n;
-      const [left, right] = await Promise.all([
-        getLogsRange(params, from, mid),
-        getLogsRange(params, mid + 1n, to),
-      ]);
-      return [...left, ...right];
+      return { logs: [], splitInto: [[from, mid], [mid + 1n, to]] };
     }
-    // A ≤CHUNK range failing is a transient throttle, not a range error —
-    // retry the same window a couple times before giving up (don't cascade-split).
-    if (attempt < 2) {
-      await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
-      return getLogsRange(params, from, to, attempt + 1);
-    }
-    return [];
+    return { logs: [] };
   }
 }
 
@@ -93,19 +101,29 @@ async function getLogsChunked(params: {
   toBlock: bigint;
 }): Promise<Log[]> {
   const { fromBlock, toBlock, ...rest } = params;
-  const ranges: [bigint, bigint][] = [];
-  for (let from = fromBlock; from <= toBlock; from += CHUNK + 1n) {
-    const to = from + CHUNK > toBlock ? toBlock : from + CHUNK;
-    ranges.push([from, to]);
+  if (fromBlock > toBlock) return [];
+
+  const allLogs: Log[] = [];
+  const queue: [bigint, bigint][] = [[fromBlock, toBlock]];
+  const inFlight = new Set<Promise<void>>();
+
+  function launch(from: bigint, to: bigint) {
+    const p = getLogsOne(rest, from, to).then((result) => {
+      allLogs.push(...result.logs);
+      if (result.splitInto) queue.push(...result.splitInto);
+    });
+    const tracked = p.finally(() => inFlight.delete(tracked));
+    inFlight.add(tracked);
   }
 
-  const logs: Log[] = [];
-  for (let i = 0; i < ranges.length; i += PARALLEL) {
-    const batch = ranges.slice(i, i + PARALLEL);
-    const results = await Promise.all(batch.map(([from, to]) => getLogsRange(rest, from, to)));
-    for (const r of results) logs.push(...r);
+  while (queue.length > 0 || inFlight.size > 0) {
+    while (queue.length > 0 && inFlight.size < PARALLEL) {
+      const next = queue.shift()!;
+      launch(next[0], next[1]);
+    }
+    if (inFlight.size > 0) await Promise.race(inFlight);
   }
-  return logs;
+  return allLogs;
 }
 
 function decodeAnchored(log: Log): AnchorEvent | null {
