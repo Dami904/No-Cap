@@ -682,6 +682,12 @@ code,
   margin: 0;
   padding: 0;
   position: relative;
+  /* A long build history scrolls inside its card instead of stretching the whole
+     page. ~28rem shows roughly 6–7 anchors before scrolling kicks in. */
+  max-height: 28rem;
+  overflow-y: auto;
+  /* room for the scrollbar so it doesn't sit on top of the timeline rail */
+  padding-right: 0.5rem;
 }
 
 .timeline::before {

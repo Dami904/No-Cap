@@ -2,71 +2,93 @@
 
 # NoCap
 
-**your build, no cap.**
+### your build, no cap.
 
-<iframe src="https://nocap-protocol.vercel.app/embed/0xa5064e866f04979cfb891a50c29eb9b7961d7832/0x5f008635f0e0ee44d497b1cba7bac6f783566a735ffa7bea950915c49eef1ee2" width="100%" height="120" style="border:0;border-radius:12px;max-width:360px"></iframe>
+**Onchain build-provenance for hackathons.** Connect a GitHub repo once and a hosted
+relayer anchors every commit fingerprint to Monad — so a build's real timeline is
+**verifiable by consensus**, not claimed. Unlike a git timestamp, an onchain anchor
+can't be rewritten, rebased, or backdated after the fact.
 
-Onchain build-provenance for hackathons. Connect GitHub once and a hosted relayer
-anchors every commit fingerprint to Monad, so a build's real timeline is
-**verifiable**, not claimed — and unlike a git timestamp, it can't be rewritten
-after the fact.
+[![License: MIT](https://img.shields.io/badge/license-MIT-6ee7b7?style=flat-square)](#license)
+[![Chain: Monad Testnet](https://img.shields.io/badge/chain-Monad%20Testnet-6ee7b7?style=flat-square)](https://testnet.monadexplorer.com)
+[![Built for: Monad Spark 2026](https://img.shields.io/badge/Monad%20Spark-2026-836EF9?style=flat-square)](#)
+[![Contracts: Foundry](https://img.shields.io/badge/contracts-Foundry-a855f7?style=flat-square)](contracts)
+[![Indexer: Envio](https://img.shields.io/badge/indexer-Envio%20HyperIndex-f97316?style=flat-square)](indexer)
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-6ee7b7)](#license)
-[![Chain: Monad Testnet](https://img.shields.io/badge/chain-Monad%20Testnet-6ee7b7)](https://testnet.monadexplorer.com)
-[![Built for: Monad Spark 2026](https://img.shields.io/badge/built%20for-Monad%20Spark%202026-6ee7b7)](#)
-
-[Live app](https://nocap-protocol.vercel.app) · [Contracts](#deployed-contracts--monad-testnet) · [Quick start](#quick-start) · [Setup guide](HOSTED_RELAYER_SETUP.md)
+**[▶ Live app](https://nocap-protocol.vercel.app)** · [Contracts](#deployed-contracts--monad-testnet) · [Architecture](#architecture) · [Quick start](#quick-start)
 
 </div>
 
 ---
 
-## Why
+## The problem
 
-Spark's own judging rules check whether a submission "started before registration"
-and flag suspicious commits — using git timestamps, which are trivially rewritable
-(`git commit --date`, rebase, force-push) by the person being judged. GitHub is both
-the trusted witness *and* a party with full write access to its own history.
+Hackathon judging rules routinely check whether a submission *"started before the
+event began"* and flag suspicious commit histories. But that check relies on **git
+timestamps — which the person being judged can trivially rewrite** (`git commit
+--date`, an interactive rebase, a force-push). GitHub is both the trusted witness
+*and* a party with full write access to the very history it's vouching for.
 
-NoCap replaces that with a witness nobody can quietly edit: once a commit SHA is
-anchored in a Monad block, "this exact commit existed at this block time" is fixed
-by consensus, not by the submitter's word. It's an upper-bound proof — it can't show
-code didn't exist earlier — but it makes the one thing judges actually check
-(*rewriting history to predate registration*) impossible, and every anchor is public
+## The fix
+
+NoCap replaces that self-attested timestamp with a witness nobody can quietly edit.
+Once a commit SHA is anchored in a Monad block, *"this exact commit existed at this
+block time"* is fixed by consensus. It's an **upper-bound proof** — it can't show
+code didn't exist *earlier* — but it makes the one thing judges actually check,
+**rewriting history to predate registration, impossible**. Every anchor is public
 and independently re-verifiable against the raw chain logs.
 
-```mermaid
-flowchart LR
-    A[Builder pushes a commit] --> B[Hosted relayer webhook]
-    B -->|anchor repoId, sha, label| C[(NoCapRegistry — Monad)]
-    C --> D[/verify page — public timeline/]
-    C --> E[/hackathon board — judge triage/]
-    D --> F{Anchors inside<br/>the registered window?}
-    F -->|yes| G[✅ No Cap]
-    F -->|no| H[⛔ Cap?]
-```
+> **Trust model, stated plainly.** The attester is NoCap's **hosted relayer** (a
+> per-repo opt-in key), not the author's personal wallet. An anchor proves *"the
+> relayer witnessed this SHA at this block time for a repo that opted in"* — not
+> *"Alice personally wrote this commit."* That's exactly the right claim for
+> provenance: it establishes **when**, and leaves authorship to the code review.
 
 ---
 
-## What ships
+## Architecture
+
+```mermaid
+flowchart LR
+    A[Builder pushes a commit] --> B[GitHub webhook]
+    B --> C[Hosted relayer<br/>Next.js API route]
+    C -->|anchor repoId, sha, label| D[(NoCapRegistry<br/>Monad testnet)]
+    D -->|events| E[Envio HyperIndex<br/>GraphQL database]
+    E --> F[/verify · public timeline/]
+    E --> G[/hackathon board · judge triage/]
+    F --> H{Anchors inside<br/>the registered window?}
+    H -->|yes| I([✅ No Cap])
+    H -->|no| J([⛔ Cap?])
+```
+
+**Write path** — a builder connects a repo (one signature, no keys, no secrets in
+their repo). GitHub's webhook fires on every push; the relayer verifies the HMAC
+signature, acknowledges fast, and anchors each commit asynchronously.
+
+**Read path** — an [Envio HyperIndex](indexer) indexer ingests the contract events
+into a GraphQL database. The frontend queries that index, so timelines and judge
+boards load instantly with no per-request chain scanning and no RPC rate limits.
+
+---
+
+## Who it's for
 
 | Role | Flow |
 |---|---|
-| **Organizer** | `/organizer` → seed a hackathon window (permissionless, first-slug-wins) → share the judge board |
-| **Builder** | `/register` → connect GitHub, pick a repo, sign once → every push auto-anchors, zero secrets |
-| **Judge** | `/hackathons` → browse every live event → drill into `/verify/{owner}/{repoId}` for a timeline, anomaly flags, and a pass/fail badge |
+| **Builder** | `/register` → connect GitHub → pick a repo → sign once. Every push auto-anchors. Zero secrets, zero CI config. |
+| **Judge** | `/hackathons` → browse live events → open `/verify/{owner}/{repoId}` for a timeline, timing-anomaly flags, and a pass/fail badge. No wallet needed. |
+| **Organizer** | `/organizer` → seed a hackathon window (permissionless, first-slug-wins) → share the judge board. |
 
-### Features
+### What's in the box
 
-- **`NoCapRegistry`** — project registration, contributor authorization, event-only commit anchors
+- **`NoCapRegistry`** — project registration, per-repo relayer opt-in, event-only commit anchors
 - **`HackathonRegistry`** — permissionless, reusable time windows; any number of hackathons run concurrently
-- **`NoCapBadge`** — soulbound "Certified No Cap" NFT; optimistic claim, always mints to the repo's real owner
-- **Hosted relayer** — GitHub App + webhook auto-anchors every push with zero secrets in the builder's repo; opt-in per repo, admin-rotatable in one transaction, rate-limited and idempotent
-- **Judge tooling** — live hackathon directory, per-event pulse stats, per-repo "build rhythm" analytics, timing-anomaly flags — all derived from onchain data, never from reading code
-- **Embed widget** — a drop-in badge (`/embed/{owner}/{repoId}`) for other platforms
+- **`NoCapBadge`** — soulbound "Certified No Cap" NFT; permissionless to trigger, always mints to the repo's registered owner
+- **Hosted relayer** — GitHub App + webhook auto-anchors every push; opt-in per repo, admin-rotatable in one transaction, idempotent and rate-limited
+- **Envio indexer** — contract events → GraphQL, so every list is an indexed query, not a chain scan
+- **Judge tooling** — live hackathon directory, per-event pulse stats, per-repo "build rhythm" analytics, advisory timing-anomaly flags — all derived from onchain data, never from reading code
+- **Embed widget** — a drop-in badge (`/embed/{owner}/{repoId}`) for submission pages and READMEs
 - **Forensic report API** — `GET /api/report/{owner}/{repoId}` — full JSON export of a project's timeline
-
-**Trust model, stated plainly:** the default attester is the **hosted relayer**, a per-repo-opt-in key, not the human author's personal wallet. An anchor proves *"NoCap's relayer attested this SHA at this block time for a repo that opted in,"* not *"Alice personally signed this commit."* That's the right trust model for hackathon provenance — worth saying out loud in every demo, not leaving implicit.
 
 ---
 
@@ -78,105 +100,116 @@ flowchart LR
 | `HackathonRegistry` | [`0xfA6A1648bdd63088b105ceFE5C150a09Ba0f5043`](https://testnet.monadexplorer.com/address/0xfA6A1648bdd63088b105ceFE5C150a09Ba0f5043) |
 | `NoCapBadge` | [`0x6371375a18f7c810fa6313084FE98aD1b6326224`](https://testnet.monadexplorer.com/address/0x6371375a18f7c810fa6313084FE98aD1b6326224) |
 
-Chain id `10143` · RPC `https://testnet-rpc.monad.xyz` · both `NoCapRegistry` and
-`NoCapBadge` are verified on Sourcify/MonadVision/MonadScan. Full deployment record
-in [`deployments/monad-testnet.json`](deployments/monad-testnet.json).
+Chain id `10143` · RPC `https://testnet-rpc.monad.xyz` · full source in
+[`contracts/`](contracts) · complete deployment record (addresses, deploy blocks,
+relayer) in [`deployments/monad-testnet.json`](deployments/monad-testnet.json).
 
 ---
 
-## Monorepo layout
+## Repository layout
 
 ```
 NoCap/
-  contracts/                Foundry — NoCapRegistry, HackathonRegistry, NoCapBadge
-  packages/shared/          computeRepoId, ABIs, window + timing analytics
-  apps/web/                 Next.js app — frontend + hosted-relayer API routes
-  HOSTED_RELAYER_SETUP.md   GitHub App + deploy checklist
-  PRODUCT.md / DESIGN.md    brand + visual system
+├── contracts/       Foundry — NoCapRegistry, HackathonRegistry, NoCapBadge (+ tests)
+├── packages/
+│   └── shared/      computeRepoId, contract ABIs, window + timing analytics
+├── apps/
+│   └── web/         Next.js 15 app — frontend + hosted-relayer API routes
+├── indexer/         Envio HyperIndex — events → GraphQL (see indexer/DEPLOY.md)
+└── deployments/     onchain deployment record
 ```
 
 ---
 
 ## Quick start
 
-### 1. Contracts
+**1. Contracts**
 
 ```bash
 cd contracts
-forge test          # 19 tests
+forge test          # 19 passing tests
 ```
 
-Deploy a fresh stack (or point at the addresses above and skip this):
+Deploy a fresh stack (or point at the addresses above and skip):
 
 ```bash
 forge script script/Deploy.s.sol:Deploy \
   --rpc-url https://testnet-rpc.monad.xyz --account nocap-deployer --broadcast
 ```
 
-### 2. Web app
+**2. Web app**
 
 ```bash
 npm install
-cp apps/web/.env.example apps/web/.env.local   # fill in addresses
-npm run dev
+cp apps/web/.env.example apps/web/.env.local   # fill in addresses + endpoints
+npm run dev                                     # → http://localhost:3000
 ```
 
-Open **http://localhost:3000**.
-
-### 3. Register a project
+**3. Register a project**
 
 Connect a wallet → `/register` → **Connect GitHub** → pick your repo → sign once.
-A hosted relayer watches pushes via a GitHub webhook and anchors every commit
-automatically — no keys to generate, no workflow file to add. Needs the GitHub App
-set up once — see [`HOSTED_RELAYER_SETUP.md`](HOSTED_RELAYER_SETUP.md) for the
-exact steps and what's already verified working live on testnet.
+The hosted relayer watches pushes via webhook and anchors every commit — no keys to
+generate, no workflow file to add. Requires the GitHub App and relayer to be
+configured once; see [`HOSTED_RELAYER_SETUP.md`](HOSTED_RELAYER_SETUP.md).
+
+**4. Indexer** (optional for local dev, powers fast reads in production)
+
+Deploy the Envio indexer and point the app at its GraphQL URL — see
+[`indexer/DEPLOY.md`](indexer/DEPLOY.md). Without it, the app falls back to direct
+log scanning automatically.
 
 ---
 
-## How it fits together
+## Design decisions worth knowing
 
-- **Canonical `repoId`** — one helper, everywhere: `keccak256(utf8(lowercase("owner/repo")))`, no `https://` prefix, no trailing slash. A mismatch between the webhook handler and the frontend means an empty verify page with no obvious cause, so `packages/shared` is the single source of truth every caller imports.
-- **Multi-hackathon by default** — a repo registers under one `hackathonId`; boards, verify pages, and badge eligibility all scope to that project's own window. Any number of events run concurrently without colliding.
-- **Anomaly signals are advisory, never a verdict** — timing heuristics (late bursts, compressed spans, pre-window anchors) are surfaced on `/verify` and never auto-disqualify anything.
-- **Badge is an optimistic, publicly-checkable claim** — `claimBadge` is permissionless and always mints to the repo's registered owner (never the caller), so anyone — including the hosted relayer — can trigger it once eligible without risk of stealing someone else's badge.
+- **One canonical `repoId`** — `keccak256(utf8(lowercase("owner/repo")))`, no
+  protocol prefix, no trailing slash. The webhook handler, the frontend, and the
+  indexer all import the same helper from `packages/shared`, so an id can never
+  drift between the write path and the read path.
+- **Multi-hackathon by default** — a repo registers under one `hackathonId`; boards,
+  verify pages, and badge eligibility all scope to that project's own window. Events
+  run concurrently without colliding.
+- **Anomaly signals are advisory, never a verdict** — late bursts, compressed spans,
+  and pre-window anchors are surfaced on `/verify` but never auto-disqualify anyone.
+  NoCap reports; humans judge.
+- **The badge can't be stolen** — `claimBadge` is permissionless to *call* but always
+  mints to `repoOwner(repoId)`, never to `msg.sender`. Anyone (a teammate, the
+  relayer) can trigger it once eligible; it always lands with the rightful owner.
 
 ---
 
 ## Security rails
 
-- Relayer wallet only — never a funded personal wallet, never reused across purposes
-- Private keys live only in server-side env vars — never in frontend code, never committed
-- `anchor()` gated by a per-repo opt-in `relayerEnabled` flag — a compromised relayer key can only touch repos that explicitly opted in, never every project on the registry
-- Relayer key is admin-rotatable — one transaction re-authorizes every opted-in repo, no per-project migration
-- No source code, no file contents, no PII ever touches the chain — only hashes and short labels
+- **Relayer key only** — never a funded personal wallet, never reused across purposes; lives only in server-side env, never in the client bundle or git.
+- **Blast radius is bounded** — `anchor()` is gated by a per-repo opt-in `relayerEnabled` flag, so a compromised relayer key can only touch repos that explicitly opted in, never every project on the registry.
+- **Rotatable in one transaction** — the admin can rotate the relayer key and re-authorize every opted-in repo atomically, with no per-project migration.
+- **Nothing sensitive touches the chain** — only commit hashes and short labels are anchored; no source, no file contents, no PII.
+- **The scan token never ships to the browser** — historical reads go through the server-side indexer/API, so no provider credential is ever inlined into client JavaScript.
 
 ---
 
-## Roadmap (all phases shipped)
+## Tech stack
 
-| Phase | Status |
-|---|---|
-| 0 · Setup | Foundry + monorepo scaffolding |
-| 1 · MVP | Registry, anchoring, landing + verify page, window badge |
-| 2 · Expansion | HackathonRegistry, multi-contributor, register/dashboard |
-| 2.5 · Discovery | Hackathon directory, chunked log scanning, per-event stats |
-| 3 · Stretch | Embed widget, soulbound badge, anomaly flags, forensic report API |
-| 4 · Hosted relayer | GitHub App, webhook auto-anchor, one-signature registration |
+**Contracts** Solidity · Foundry · OpenZeppelin — deployed to Monad testnet
+**Web** Next.js 15 (App Router) · React · viem · wagmi — deployed on Vercel
+**Indexer** Envio HyperIndex → GraphQL
+**Onchain reads/writes** viem against Monad testnet (chain id `10143`)
 
 ---
 
 ## Demo script (&lt; 3 min)
 
-1. Register a project — connect GitHub, pick the repo, sign once
-2. Push a commit on camera
-3. Show the anchor land — open `/verify`, watch the timeline update
-4. Point at the green **No Cap** badge
-5. Flash the judge board across a couple of live hackathons
+1. **Register** — connect GitHub, pick the repo, one signature.
+2. **Build** — push a commit on camera.
+3. **Prove** — open `/verify`, watch the anchor land on the timeline.
+4. **Certify** — point at the green **No Cap** badge.
+5. **Judge** — flash the board across a couple of live hackathons.
 
-*I built a tool that proves hackathon submissions aren't backdated, then used it to prove this one isn't — no cap.*
+> *"I built a tool that proves hackathon submissions aren't backdated — then used it
+> to prove this one isn't. No cap."*
 
 ---
 
 ## License
 
-MIT
+[MIT](#license) © 2026 NoCap
