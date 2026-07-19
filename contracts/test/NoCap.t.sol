@@ -144,6 +144,37 @@ contract NoCapTest is Test {
         badge.transferFrom(owner, stranger, tokenId);
     }
 
+    function test_defaultSpanIsHackathonFriendly() public view {
+        assertEq(badge.minSpanSeconds(), 1 hours);
+        assertEq(badge.minAnchors(), 3);
+    }
+
+    function test_setEligibilityByAdmin() public {
+        badge.setEligibility(2, 30 minutes);
+        assertEq(badge.minAnchors(), 2);
+        assertEq(badge.minSpanSeconds(), 30 minutes);
+    }
+
+    function test_setEligibilityRevertsForNonAdmin() public {
+        vm.prank(stranger);
+        vm.expectRevert("not admin");
+        badge.setEligibility(1, 0);
+    }
+
+    function test_setEligibilityRevertsBelowOneAnchor() public {
+        vm.expectRevert("minAnchors >= 1");
+        badge.setEligibility(0, 1 hours);
+    }
+
+    function test_shortSpanBuildQualifiesAfterLowering() public {
+        badge.setEligibility(3, 30 minutes);
+        uint256[] memory ts = new uint256[](3);
+        ts[0] = START + 1 hours;
+        ts[1] = START + 1 hours + 20 minutes;
+        ts[2] = START + 1 hours + 40 minutes; // 40-min span, was too short at 1h default
+        assertTrue(badge.isEligible(repoId, sparkId, ts));
+    }
+
     function test_repoIdLowercases() public {
         assertEq(RepoId.compute("NoCap/Demo"), RepoId.compute("nocap/demo"));
     }

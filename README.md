@@ -106,7 +106,7 @@ boards load instantly with no per-request chain scanning and no RPC rate limits.
 |---|---|
 | `NoCapRegistry` | [`0x4931e958ac49919177E53e88DD4C7cE4D27a36E3`](https://testnet.monadexplorer.com/address/0x4931e958ac49919177E53e88DD4C7cE4D27a36E3) |
 | `HackathonRegistry` | [`0xfA6A1648bdd63088b105ceFE5C150a09Ba0f5043`](https://testnet.monadexplorer.com/address/0xfA6A1648bdd63088b105ceFE5C150a09Ba0f5043) |
-| `NoCapBadge` | [`0x6371375a18f7c810fa6313084FE98aD1b6326224`](https://testnet.monadexplorer.com/address/0x6371375a18f7c810fa6313084FE98aD1b6326224) |
+| `NoCapBadge` | [`0x4928a13F2F6CaA1D069d3702B467416C07b722EF`](https://testnet.monadexplorer.com/address/0x4928a13F2F6CaA1D069d3702B467416C07b722EF) |
 
 Chain id `10143` · RPC `https://testnet-rpc.monad.xyz` · full source in
 [`contracts/`](contracts) · complete deployment record (addresses, deploy blocks,
@@ -135,7 +135,7 @@ NoCap/
 
 ```bash
 cd contracts
-forge test          # 19 passing tests
+forge test          # 24 passing tests
 ```
 
 Deploy a fresh stack (or point at the addresses above and skip):

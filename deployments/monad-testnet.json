@@ -8,7 +8,7 @@
   "contracts": {
     "NoCapRegistry": "0x4931e958ac49919177E53e88DD4C7cE4D27a36E3",
     "HackathonRegistry": "0xfA6A1648bdd63088b105ceFE5C150a09Ba0f5043",
-    "NoCapBadge": "0x6371375a18f7c810fa6313084FE98aD1b6326224"
+    "NoCapBadge": "0x4928a13F2F6CaA1D069d3702B467416C07b722EF"
   },
   "relayer": "0x550B5C45439Ebf11fd5B02AF8A970F5c4Ce9B17B",
   "sparkHackathonId": "0x8c61c3081822adbadd1e72b08c1063e7248b1da8ed427e06e28bbb8208dc224d",

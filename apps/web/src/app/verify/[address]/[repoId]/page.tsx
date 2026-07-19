@@ -81,6 +81,18 @@ export default function VerifyPage({
   const last = timestamps[timestamps.length - 1];
   const streak = activeDayStreak(timestamps);
 
+  // Badge eligibility is judged only on anchors that fall inside the hackathon
+  // window — a commit pushed after the window closed shouldn't break (or count
+  // toward) the claim. The contract checks the timestamps it's handed, so we hand
+  // it exactly the in-window ones.
+  const claimTimestamps = useMemo(
+    () =>
+      timestamps.filter(
+        (t) => t >= activeWindow.startTime && t <= activeWindow.endTime
+      ),
+    [timestamps, activeWindow.startTime, activeWindow.endTime]
+  );
+
   const ownerMismatch =
     owner && owner.toLowerCase() !== ownerParam.toLowerCase();
 
@@ -196,7 +208,7 @@ export default function VerifyPage({
                 </p>
                 <ClaimBadgeButton
                   repoId={repoId}
-                  timestamps={timestamps}
+                  timestamps={claimTimestamps}
                   hackathonId={activeWindow.hackathonId}
                 />
               </div>

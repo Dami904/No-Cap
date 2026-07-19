@@ -17,8 +17,15 @@ contract NoCapBadge is ERC721 {
     NoCapRegistry public immutable projectRegistry;
 
     uint256 public nextTokenId = 1;
+    // Anti-gaming floor: a badge needs at least `minAnchors` commits spanning at
+    // least `minSpanSeconds`, so it can't be earned from a single last-minute burst.
+    // Tuned for hackathons (an intense one-day build should qualify); admin can
+    // adjust both via setEligibility as event formats vary.
     uint256 public minAnchors = 3;
-    uint256 public minSpanSeconds = 1 days;
+    uint256 public minSpanSeconds = 1 hours;
+
+    /// @notice May tune eligibility thresholds. Set to the deployer.
+    address public admin;
 
     /// @dev repoId => hackathonId => claimed
     mapping(bytes32 => mapping(bytes32 => bool)) public claimed;
@@ -31,6 +38,7 @@ contract NoCapBadge is ERC721 {
         bytes32 indexed repoId,
         bytes32 hackathonId
     );
+    event EligibilityUpdated(uint256 minAnchors, uint256 minSpanSeconds);
 
     constructor(address hackathonRegistry_, address projectRegistry_)
         ERC721("Certified No Cap", "NOCAP")
@@ -39,6 +47,17 @@ contract NoCapBadge is ERC721 {
         require(projectRegistry_ != address(0), "zero registry");
         hackathonRegistry = HackathonRegistry(hackathonRegistry_);
         projectRegistry = NoCapRegistry(projectRegistry_);
+        admin = msg.sender;
+    }
+
+    /// @notice Tune the eligibility thresholds (e.g. a shorter span for a 24h
+    ///         hackathon, a longer one for a multi-week program). Admin-only.
+    function setEligibility(uint256 minAnchors_, uint256 minSpanSeconds_) external {
+        require(msg.sender == admin, "not admin");
+        require(minAnchors_ >= 1, "minAnchors >= 1");
+        minAnchors = minAnchors_;
+        minSpanSeconds = minSpanSeconds_;
+        emit EligibilityUpdated(minAnchors_, minSpanSeconds_);
     }
 
     /// @notice Optimistic eligibility: caller supplies timestamps; anyone can re-verify vs logs.
