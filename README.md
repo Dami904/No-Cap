@@ -19,9 +19,11 @@ can't be rewritten, rebased, or backdated after the fact.
 
 <br/>
 
-**NoCap proving NoCap** — this repository's own build history is anchored on Monad. The badge below is live, served by this project's own API:
+**NoCap proving NoCap** — this repository's own build history is anchored on Monad. The badge below is live, rendered by this project's own API from onchain data:
 
-[![build provenance](https://img.shields.io/endpoint?url=https%3A%2F%2Fnocap-protocol.vercel.app%2Fapi%2Fbadge%2F0xa5064e866f04979cfb891a50c29eb9b7961d7832%2F0x5f008635f0e0ee44d497b1cba7bac6f783566a735ffa7bea950915c49eef1ee2&style=for-the-badge)](https://nocap-protocol.vercel.app/verify/0xa5064e866f04979cfb891a50c29eb9b7961d7832/0x5f008635f0e0ee44d497b1cba7bac6f783566a735ffa7bea950915c49eef1ee2)
+[![NoCap build provenance](https://nocap-protocol.vercel.app/api/badge-svg/0xa5064e866f04979cfb891a50c29eb9b7961d7832/0x5f008635f0e0ee44d497b1cba7bac6f783566a735ffa7bea950915c49eef1ee2)](https://nocap-protocol.vercel.app/verify/0xa5064e866f04979cfb891a50c29eb9b7961d7832/0x5f008635f0e0ee44d497b1cba7bac6f783566a735ffa7bea950915c49eef1ee2)
+
+> Anyone who registers a repo gets one at `…/api/badge-svg/{owner}/{repoId}`, with a copy-paste snippet on their verify page.
 
 </div>
 

@@ -6,7 +6,7 @@ import {
   formatDuration,
   type AnchorEvent,
 } from "@nocap/shared";
-import { formatTs, shorten } from "@/lib/format";
+import { formatTs, formatDay, shorten } from "@/lib/format";
 
 /** Per-repo build rhythm — the tamper-proof *shape* of when a project was built,
  *  computed entirely from onchain anchor timestamps. No code is ever inspected. */
@@ -30,7 +30,7 @@ export function BuildRhythm({ anchors }: { anchors: AnchorEvent[] }) {
     },
     {
       label: "Busiest day",
-      value: s.busiestDay ? `${s.busiestDay.day.slice(5)} · ${s.busiestDay.count}` : "—",
+      value: s.busiestDay ? `${formatDay(s.busiestDay.day)} · ${s.busiestDay.count}` : "—",
     },
   ];
 

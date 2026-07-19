@@ -21,6 +21,7 @@ import { VelocityChart } from "@/components/VelocityChart";
 import { shorten } from "@/lib/format";
 import { ClaimBadgeButton } from "@/components/ClaimBadgeButton";
 import { BuildRhythm } from "@/components/BuildRhythm";
+import { ReadmeBadge } from "@/components/ReadmeBadge";
 
 export default function VerifyPage({
   params,
@@ -198,6 +199,12 @@ export default function VerifyPage({
                   timestamps={timestamps}
                   hackathonId={activeWindow.hackathonId}
                 />
+              </div>
+              <div className="card">
+                <h2 className="page-title" style={{ fontSize: "1.1rem" }}>
+                  README badge
+                </h2>
+                <ReadmeBadge owner={ownerParam} repoId={repoId} />
               </div>
               <div className="card">
                 <h2 className="page-title" style={{ fontSize: "1.1rem" }}>
