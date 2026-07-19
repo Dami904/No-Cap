@@ -52,21 +52,26 @@ export function ClaimBadgeButton({
 
   return (
     <div>
-      {!isConnected && <p className="muted">Connect wallet to claim (owner/claimer).</p>}
+      <p className="dim" style={{ fontSize: "0.82rem", marginTop: 0 }}>
+        The badge always mints to the <strong>repo owner&apos;s wallet</strong> — set when the
+        project was registered onchain — no matter who submits this. Triggering it just pays the
+        gas; you can&apos;t claim someone else&apos;s badge.
+      </p>
+      {!isConnected && <p className="muted">Connect a wallet to submit the claim.</p>}
       <button
         className="btn btn-primary"
         type="button"
         disabled={!isConnected || isPending || confirming}
         onClick={claim}
       >
-        {isPending || confirming ? "Claiming…" : "Claim soulbound badge"}
+        {isPending || confirming ? "Claiming…" : "Mint badge to repo owner"}
       </button>
       {(error || localErr) && (
         <div className="error-box">{localErr || error?.message}</div>
       )}
       {isSuccess && (
         <div className="success-box">
-          Claimed.{" "}
+          Badge minted to the repo owner.{" "}
           <Link href={`/badge/pending`}>View badge</Link>
           {hash && (
             <span className="mono" style={{ display: "block", fontSize: "0.8rem" }}>
