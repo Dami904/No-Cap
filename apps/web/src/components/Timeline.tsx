@@ -29,8 +29,8 @@ export function Timeline({
   if (anchors.length === 0) {
     return (
       <p className="muted">
-        No anchors yet. Push a commit with the NoCap Action (or run the CLI) after registering
-        and adding the attester as a contributor.
+        No anchors yet. Once the repo is registered (Connect GitHub → sign), just push a commit —
+        the hosted relayer anchors it to Monad automatically.
       </p>
     );
   }

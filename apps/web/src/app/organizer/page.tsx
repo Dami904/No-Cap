@@ -187,7 +187,7 @@ export default function OrganizerPage() {
           <li>
             Open <Link href="/register">Register</Link> and enter your slug as the hackathon
           </li>
-          <li>Wire the NoCap Action in their repo</li>
+          <li>Connect GitHub and pick their repo — no setup in the repo itself</li>
           <li>
             Their timelines appear on <code>/hackathon/&lt;slug&gt;</code> automatically
           </li>
