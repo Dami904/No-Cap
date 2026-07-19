@@ -36,9 +36,13 @@ export default function HomePage() {
             </div>
             <div className="terminal-body">
               <p>
+                <span className="t-prompt">$</span> Connect GitHub → pick repo → sign
+              </p>
+              <p className="t-dim">⚡ repo authorized · registerAndAuthorize()</p>
+              <p>
                 <span className="t-prompt">$</span> git push origin main
               </p>
-              <p className="t-dim">⚡ NoCap Action · anchor(repoId, 6ff3a2c)</p>
+              <p className="t-dim">⚡ webhook → anchor(repoId, 6ff3a2c)</p>
               <p className="t-ok">✓ anchored on Monad · finalized in ~800ms</p>
               <p>
                 <span className="t-prompt">$</span> nocap verify
@@ -57,16 +61,16 @@ export default function HomePage() {
           <div className="step-num">01</div>
           <h2>Register</h2>
           <p>
-            Claim your repo onchain. First registrant wins ownership — then authorize your CI
-            burner as a contributor.
+            Connect your GitHub repo and sign once. No keys to generate, no CI to configure —
+            first registrant wins ownership onchain.
           </p>
         </div>
         <div className="step">
           <div className="step-num">02</div>
           <h2>Build</h2>
           <p>
-            Every push fires the GitHub Action → <code>anchor()</code> on Monad. Zero manual
-            effort.
+            Just push. Our hosted relayer anchors every commit to Monad automatically — zero
+            secrets in your repo, zero manual effort.
           </p>
         </div>
         <div className="step">
