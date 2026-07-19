@@ -373,6 +373,35 @@ code,
   transform: translateY(1px);
 }
 
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  padding: 0.3rem 0.2rem;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, transform 0.1s;
+}
+
+.back-link:hover {
+  color: var(--accent);
+}
+
+.back-link:active {
+  transform: translateX(-2px);
+}
+
+.back-link span {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
 .btn-primary {
   background: var(--accent);
   color: #062016;

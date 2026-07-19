@@ -7,6 +7,7 @@ import { explorerAddressUrl, ZERO_ADDRESS } from "@nocap/shared";
 import { ADDRESSES, SITE } from "@/lib/config";
 import { shorten } from "@/lib/format";
 import { Nav } from "./Nav";
+import { BackLink } from "./BackLink";
 
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname() || "";
@@ -14,10 +15,17 @@ export function Shell({ children }: { children: ReactNode }) {
   if (embed) {
     return <>{children}</>;
   }
+  // Show a back control on every page except the landing page — these are the
+  // drill-down destinations (register, dashboard, a hackathon board, a verify
+  // timeline, a badge) a user reaches from somewhere else.
+  const showBack = path !== "/";
   return (
     <div className="shell">
       <Nav />
-      <main>{children}</main>
+      <main>
+        {showBack && <BackLink />}
+        {children}
+      </main>
       <footer className="footer">
         <div className="footer-grid">
           <div className="footer-brand">
