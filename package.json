@@ -10,8 +10,7 @@
   "scripts": {
     "dev": "npm run dev -w @nocap/web",
     "build:web": "npm run build -w @nocap/web",
-    "test:contracts": "cd contracts && forge test",
-    "cli": "npm run start -w @nocap/cli"
+    "test:contracts": "cd contracts && forge test"
   },
   "engines": {
     "node": ">=20"

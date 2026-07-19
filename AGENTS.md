@@ -29,7 +29,7 @@ not the source of truth.
 - Fetch skills.devnads.com during the build if local `skills/monskill` exists.
 - Hallucinate token/contract addresses — use `addresses/`.
 - Use inflated gas limits (Monad charges on limit, not gas used).
-- Skip adding the CI burner as a contributor before anchoring.
+- Skip registering a repo (`registerAndAuthorize`) before expecting the hosted relayer to anchor its pushes.
 
 ## Product
 

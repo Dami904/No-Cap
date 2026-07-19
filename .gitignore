@@ -23,7 +23,6 @@ contracts/.verify-tmp/
 .DS_Store
 coverage/
 .vercel
-packages/cli/node_modules/
 apps/web/node_modules/
 packages/shared/node_modules/
 

@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import type { Address, Hex } from "viem";
+import type { Hex } from "viem";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import {
   computeRepoId,
@@ -46,17 +46,14 @@ function RegisterPageInner() {
   const [ghError, setGhError] = useState<string | null>(null);
 
   const [repo, setRepo] = useState("");
-  const [manualMode, setManualMode] = useState(false);
-  const [repoUrl, setRepoUrl] = useState("");
-  const [contributor, setContributor] = useState("");
   const [windows, setWindows] = useState<HackathonListing[]>([]);
   const [windowsLoading, setWindowsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<Hex | "">("");
-  const [step, setStep] = useState<"register" | "contributor" | "done">("register");
+  const [done, setDone] = useState(false);
 
   const repoId = useMemo(() => (repo.trim() ? computeRepoId(repo) : null), [repo]);
   const now = useMemo(() => Math.floor(Date.now() / 1000), []);
-  const usingHostedRelayer = !manualMode && ghConnected;
+  const canRegister = ghConnected && !!ghRepos && ghRepos.length > 0;
 
   useEffect(() => {
     fetch("/api/github/installations/repos")
@@ -123,45 +120,18 @@ function RegisterPageInner() {
   async function onRegister(e: React.FormEvent) {
     e.preventDefault();
     if (!repoId || !hackWin) return;
-    const url =
-      repoUrl.trim() ||
-      `https://github.com/${repo.trim().replace(/^https?:\/\/github\.com\//i, "").replace(/\/$/, "")}`;
-    // Explicit gas limits — Monad charges gas_limit (monskills gas/), not gas used.
-    if (usingHostedRelayer) {
-      // One signature: registers AND opts this repo into the hosted relayer, which
-      // is already watching this exact repo because GitHub only let us see it after
-      // verifying the connected account administers it.
-      await writeContractAsync({
-        address: ADDRESSES.registry,
-        abi: noCapRegistryAbi,
-        functionName: "registerAndAuthorize",
-        args: [repoId, url, hackWin.hackathonId],
-        gas: 220_000n,
-      });
-      setStep("done");
-    } else {
-      await writeContractAsync({
-        address: ADDRESSES.registry,
-        abi: noCapRegistryAbi,
-        functionName: "registerProject",
-        args: [repoId, url, hackWin.hackathonId],
-        gas: 180_000n,
-      });
-      setStep("contributor");
-    }
-  }
-
-  async function onAddContributor(e: React.FormEvent) {
-    e.preventDefault();
-    if (!repoId || !contributor) return;
+    const url = `https://github.com/${repo.trim().replace(/^https?:\/\/github\.com\//i, "").replace(/\/$/, "")}`;
+    // One signature: registers AND opts this repo into the hosted relayer, which is
+    // already watching this exact repo because GitHub only let us see it after
+    // verifying the connected account administers it.
     await writeContractAsync({
       address: ADDRESSES.registry,
       abi: noCapRegistryAbi,
-      functionName: "addContributor",
-      args: [repoId, contributor as Address],
-      gas: 80_000n,
+      functionName: "registerAndAuthorize",
+      args: [repoId, url, hackWin.hackathonId],
+      gas: 220_000n,
     });
-    setStep("done");
+    setDone(true);
   }
 
   return (
@@ -198,176 +168,119 @@ function RegisterPageInner() {
               Connected as <span className="mono">{address}</span>
             </p>
 
-            {step === "register" && (
+            {!done && !isSuccess && (
               <>
-                {!manualMode && (
-                  <div style={{ marginBottom: "1rem" }}>
-                    {ghLoading ? (
-                      <p className="muted">Checking GitHub connection…</p>
-                    ) : ghConnected && ghRepos && ghRepos.length > 0 ? (
-                      <div
-                        className="success-box"
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: "0.5rem",
-                        }}
+                <div style={{ marginBottom: "1rem" }}>
+                  {ghLoading ? (
+                    <p className="muted">Checking GitHub connection…</p>
+                  ) : canRegister ? (
+                    <div
+                      className="success-box"
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "0.5rem",
+                      }}
+                    >
+                      <span>
+                        GitHub connected — {ghRepos!.length} repo
+                        {ghRepos!.length === 1 ? "" : "s"} available.
+                      </span>
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ fontSize: "0.78rem", padding: "0.4rem 0.75rem" }}
+                        onClick={disconnectGithub}
                       >
-                        <span>
-                          GitHub connected — {ghRepos.length} repo
-                          {ghRepos.length === 1 ? "" : "s"} available.
-                        </span>
-                        <button
-                          type="button"
-                          className="btn"
-                          style={{ fontSize: "0.78rem", padding: "0.4rem 0.75rem" }}
-                          onClick={disconnectGithub}
-                        >
-                          Disconnect
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="card" style={{ textAlign: "center" }}>
-                        <p className="muted" style={{ marginTop: 0 }}>
-                          Connect GitHub so NoCap can anchor your pushes automatically.
-                          Installing only grants access to repos you choose.
+                        Disconnect
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="card" style={{ textAlign: "center" }}>
+                      <p className="muted" style={{ marginTop: 0 }}>
+                        Connect GitHub so NoCap can anchor your pushes automatically.
+                        Installing only grants access to repos you choose.
+                      </p>
+                      {installUrl ? (
+                        <a className="btn btn-primary" href={installUrl}>
+                          Connect GitHub →
+                        </a>
+                      ) : (
+                        <p className="dim" style={{ fontSize: "0.85rem" }}>
+                          GitHub App isn&apos;t configured on this deployment yet.
                         </p>
-                        {installUrl ? (
-                          <a className="btn btn-primary" href={installUrl}>
-                            Connect GitHub →
-                          </a>
-                        ) : (
-                          <p className="dim" style={{ fontSize: "0.85rem" }}>
-                            GitHub App not configured yet — use manual registration below.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    {ghError && <div className="error-box">{ghError}</div>}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  )}
+                  {ghError && <div className="error-box">{ghError}</div>}
+                </div>
 
-                <form onSubmit={onRegister}>
-                  {usingHostedRelayer && ghRepos && ghRepos.length > 0 ? (
+                {canRegister && (
+                  <form onSubmit={onRegister}>
                     <label className="field">
                       Repo
-                      <RepoPicker repos={ghRepos} value={repo} onChange={setRepo} />
+                      <RepoPicker repos={ghRepos!} value={repo} onChange={setRepo} />
                     </label>
-                  ) : (
-                    <>
-                      <label className="field">
-                        GitHub repo (owner/name)
-                        <input
-                          value={repo}
-                          onChange={(e) => setRepo(e.target.value)}
-                          placeholder="you/nocap-demo"
+
+                    {repoId && (
+                      <p className="mono dim" style={{ fontSize: "0.8rem", wordBreak: "break-all" }}>
+                        repoId {repoId}
+                      </p>
+                    )}
+
+                    <label className="field">
+                      Hackathon
+                      {windowsLoading ? (
+                        <select disabled>
+                          <option>Loading hackathons from chain…</option>
+                        </select>
+                      ) : windows.length === 0 ? (
+                        <select disabled>
+                          <option>No hackathons seeded yet</option>
+                        </select>
+                      ) : (
+                        <select
+                          value={selectedId}
+                          onChange={(e) => setSelectedId(e.target.value as Hex)}
                           required
-                        />
-                      </label>
-                      <label className="field">
-                        Repo URL (optional)
-                        <input
-                          value={repoUrl}
-                          onChange={(e) => setRepoUrl(e.target.value)}
-                          placeholder="https://github.com/you/nocap-demo"
-                        />
-                      </label>
-                    </>
-                  )}
+                        >
+                          {windows.map((w) => {
+                            const s = windowStatus(w, now);
+                            return (
+                              <option key={w.hackathonId} value={w.hackathonId}>
+                                {w.name} {s === "live" ? "(live)" : s === "upcoming" ? "(upcoming)" : "(ended)"}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      )}
+                      {hackWin && (
+                        <span className="dim" style={{ fontSize: "0.8rem" }}>
+                          {formatTs(hackWin.startTime)} → {formatTs(hackWin.endTime)}
+                        </span>
+                      )}
+                      {!windowsLoading && windows.length === 0 && (
+                        <span className="dim" style={{ fontSize: "0.8rem" }}>
+                          Ask your organizer to <Link href="/organizer">seed a window</Link> first.
+                        </span>
+                      )}
+                    </label>
 
-                  {repoId && (
-                    <p className="mono dim" style={{ fontSize: "0.8rem", wordBreak: "break-all" }}>
-                      repoId {repoId}
-                    </p>
-                  )}
-
-                  <label className="field">
-                    Hackathon
-                    {windowsLoading ? (
-                      <select disabled>
-                        <option>Loading hackathons from chain…</option>
-                      </select>
-                    ) : windows.length === 0 ? (
-                      <select disabled>
-                        <option>No hackathons seeded yet</option>
-                      </select>
-                    ) : (
-                      <select
-                        value={selectedId}
-                        onChange={(e) => setSelectedId(e.target.value as Hex)}
-                        required
-                      >
-                        {windows.map((w) => {
-                          const s = windowStatus(w, now);
-                          return (
-                            <option key={w.hackathonId} value={w.hackathonId}>
-                              {w.name} {s === "live" ? "(live)" : s === "upcoming" ? "(upcoming)" : "(ended)"}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    )}
-                    {hackWin && (
-                      <span className="dim" style={{ fontSize: "0.8rem" }}>
-                        {formatTs(hackWin.startTime)} → {formatTs(hackWin.endTime)}
-                      </span>
-                    )}
-                    {!windowsLoading && windows.length === 0 && (
-                      <span className="dim" style={{ fontSize: "0.8rem" }}>
-                        Ask your organizer to <Link href="/organizer">seed a window</Link> first.
-                      </span>
-                    )}
-                  </label>
-
-                  <button
-                    className="btn btn-primary"
-                    type="submit"
-                    disabled={!registryReady || !hackWin || !repoId || isPending || confirming}
-                  >
-                    {isPending || confirming
-                      ? "Submitting…"
-                      : usingHostedRelayer
-                        ? "Register + enable auto-anchor"
-                        : "Register on Monad"}
-                  </button>
-                </form>
-
-                <button
-                  type="button"
-                  className="btn"
-                  style={{ marginTop: "0.75rem", fontSize: "0.82rem" }}
-                  onClick={() => setManualMode((v) => !v)}
-                >
-                  {manualMode ? "Use GitHub connection instead" : "I'll run my own CI burner instead"}
-                </button>
+                    <button
+                      className="btn btn-primary"
+                      type="submit"
+                      disabled={!registryReady || !hackWin || !repoId || isPending || confirming}
+                    >
+                      {isPending || confirming ? "Submitting…" : "Register + enable auto-anchor"}
+                    </button>
+                  </form>
+                )}
               </>
             )}
 
-            {step === "contributor" && repoId && (
-              <div style={{ marginTop: "1.25rem" }}>
-                <div className="success-box">
-                  Project registered. Now authorize your CI burner as a contributor.
-                </div>
-                <form onSubmit={onAddContributor}>
-                  <label className="field">
-                    Action / attester address
-                    <input
-                      value={contributor}
-                      onChange={(e) => setContributor(e.target.value)}
-                      placeholder="0x… burner from GitHub secret"
-                      required
-                    />
-                  </label>
-                  <button className="btn" type="submit" disabled={isPending || confirming}>
-                    Add contributor
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {(step === "done" || isSuccess) && repoId && address && (
+            {(done || isSuccess) && repoId && address && (
               <p style={{ marginTop: "1.25rem" }}>
                 <Link className="btn btn-primary" href={`/verify/${address}/${repoId}`}>
                   Open verify page →
@@ -384,23 +297,6 @@ function RegisterPageInner() {
           </>
         )}
       </div>
-
-      {(manualMode || !ghConnected) && !ghLoading && (
-        <div className="card">
-          <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Self-hosted CI path</h2>
-          <ol className="muted" style={{ paddingLeft: "1.2rem", marginBottom: 0 }}>
-            <li>
-              Add secrets <code>NOCAP_PRIVATE_KEY</code> (your own burner) and{" "}
-              <code>NOCAP_REGISTRY</code>
-            </li>
-            <li>
-              Keep <code>.github/workflows/nocap-anchor.yml</code>
-            </li>
-            <li>Add the burner address as contributor (form above)</li>
-            <li>Push a commit — your Action anchors it</li>
-          </ol>
-        </div>
-      )}
     </div>
   );
 }
