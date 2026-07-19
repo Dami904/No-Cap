@@ -17,6 +17,12 @@ can't be rewritten, rebased, or backdated after the fact.
 
 **[▶ Live app](https://nocap-protocol.vercel.app)** · [Contracts](#deployed-contracts--monad-testnet) · [Architecture](#architecture) · [Quick start](#quick-start)
 
+<br/>
+
+**NoCap proving NoCap** — this repository's own build history is anchored on Monad. The badge below is live, served by this project's own API:
+
+[![build provenance](https://img.shields.io/endpoint?url=https%3A%2F%2Fnocap-protocol.vercel.app%2Fapi%2Fbadge%2F0xa5064e866f04979cfb891a50c29eb9b7961d7832%2F0x5f008635f0e0ee44d497b1cba7bac6f783566a735ffa7bea950915c49eef1ee2&style=for-the-badge)](https://nocap-protocol.vercel.app/verify/0xa5064e866f04979cfb891a50c29eb9b7961d7832/0x5f008635f0e0ee44d497b1cba7bac6f783566a735ffa7bea950915c49eef1ee2)
+
 </div>
 
 ---
