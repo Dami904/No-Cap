@@ -1,38 +1,23 @@
-# Indexer (Phase 2.5 / monskills `indexer/`)
+## Envio Indexer
 
-Phase 1–2 use **direct `eth_getLogs`** with a short in-memory cache (`apps/web/src/lib/indexer.ts`). That is enough for a single-hackathon demo.
+*Please refer to the [documentation website](https://docs.envio.dev) for a thorough guide on all [Envio](https://envio.dev) indexer features*
 
-When volume justifies it (judge board concurrent traffic), initialize **Envio HyperIndex** per monskills:
-
-## Prereqs (you run these — agent must not login for you)
+### Run
 
 ```bash
-npm install -g envio-cloud
-envio-cloud login
-# gh auth login if deploying from GitHub
+pnpm dev
 ```
 
-## After contracts are deployed **and verified**
+Visit http://localhost:8080 to see the GraphQL Playground, local password is `testing`.
+
+### Generate files from `config.yaml` or `schema.graphql`
 
 ```bash
-cd indexer
-pnpx envio@3.0.0-alpha.21 init contract-import explorer \
-  -b monad-testnet \
-  -c <NOCAP_REGISTRY_ADDRESS> \
-  -n NoCapRegistry \
-  -l typescript \
-  -d ./ -o ./ \
-  --all-events --single-contract --api-token ""
+pnpm codegen
 ```
 
-Add to `config.yaml`:
+### Pre-requisites
 
-```yaml
-field_selection:
-  transaction_fields:
-    - hash
-```
-
-Then `pnpm codegen`, implement handlers, deploy via Envio Cloud workflows.
-
-Until then, the web app reads logs live — no Envio required for MVP.
+- [Node.js v22+ (v24 recommended)](https://nodejs.org/en/download/current)
+- [pnpm (use v8 or newer)](https://pnpm.io/installation)
+- [Docker](https://www.docker.com/products/docker-desktop/) or [Podman](https://podman.io/)

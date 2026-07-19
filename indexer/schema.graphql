@@ -1,0 +1,44 @@
+"""
+One row per Anchored event — the append-only build timeline. Queried by repoId,
+ordered by timestamp. id is chainId_blockNumber_logIndex (globally unique).
+"""
+type Anchor {
+  id: ID!
+  builder: String!
+  repoId: String! @index
+  commitHash: String!
+  label: String!
+  timestamp: BigInt!
+  txHash: String!
+  blockNumber: BigInt!
+}
+
+"""
+One row per registered project, keyed by repoId (registerProject requires the
+repo to be previously unregistered, so repoId is a natural unique id). Queried
+by hackathonId (judge board) and by builder (dashboard).
+"""
+type Project {
+  id: ID!
+  builder: String! @index
+  repoId: String!
+  hackathonId: String! @index
+  repoUrl: String!
+  registeredAt: BigInt!
+  txHash: String!
+  blockNumber: BigInt!
+}
+
+"""
+One row per hackathon window, keyed by hackathonId. Windows can be re-registered
+to update their times, so the handler upserts and keeps the latest by block.
+"""
+type HackathonWindow {
+  id: ID!
+  hackathonId: String!
+  organizer: String!
+  name: String!
+  startTime: BigInt!
+  endTime: BigInt!
+  blockNumber: BigInt!
+}

@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=./node_modules/envio/evm.schema.json
+name: nocap-indexer
+# The frontend links each anchor to its Monad explorer tx, so pull the tx hash.
+field_selection:
+  transaction_fields:
+    - hash
+chains:
+- id: 10143
+  # Earliest of the two contracts' deploy blocks (HackathonRegistry @ 45945564,
+  # NoCapRegistry @ 46023808) — one chain-level start covers both.
+  start_block: 45945564
+  contracts:
+  - name: NoCapRegistry
+    address:
+    - 0x4931e958ac49919177E53e88DD4C7cE4D27a36E3
+    events:
+    - event: Anchored(address indexed builder, bytes32 indexed repoId, bytes32 commitHash, string label, uint256 timestamp)
+    - event: ProjectRegistered(address indexed builder, bytes32 indexed repoId, bytes32 indexed hackathonId, string repoUrl, uint256 registeredAt)
+  - name: HackathonRegistry
+    address:
+    - 0xfA6A1648bdd63088b105ceFE5C150a09Ba0f5043
+    events:
+    - event: WindowRegistered(bytes32 indexed hackathonId, address indexed organizer, string name, uint256 startTime, uint256 endTime)

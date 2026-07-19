@@ -32,6 +32,79 @@ function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
   });
 }
 
+// --- Envio HyperIndex GraphQL path -----------------------------------------
+// When NEXT_PUBLIC_INDEXER_URL is set, event history comes from the indexer's
+// GraphQL database (Anchor/Project/HackathonWindow entities) instead of scanning
+// eth_getLogs. This removes the whole rate-limit problem: no provider token in
+// the browser, no chain scan per page load, just an indexed DB query. The
+// eth_getLogs machinery below stays as a fallback for when the URL is unset
+// (local dev without an indexer, or before the indexer is deployed). Contract
+// point-reads (getWindowById, getRepoOwner, …) always use the RPC — they read
+// live contract state the indexer doesn't store.
+const INDEXER_URL = process.env.NEXT_PUBLIC_INDEXER_URL || "";
+
+async function gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+  const res = await fetch(INDEXER_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ query, variables }),
+  });
+  const json = (await res.json()) as { data?: T; errors?: { message: string }[] };
+  if (json.errors?.length) throw new Error(json.errors[0]!.message);
+  if (!json.data) throw new Error("indexer returned no data");
+  return json.data;
+}
+
+type GqlAnchor = {
+  builder: string;
+  repoId: string;
+  commitHash: string;
+  label: string;
+  timestamp: string;
+  txHash: string;
+  blockNumber: string;
+};
+type GqlProject = {
+  builder: string;
+  repoId: string;
+  hackathonId: string;
+  repoUrl: string;
+  registeredAt: string;
+  txHash: string;
+  blockNumber: string;
+};
+type GqlWindow = {
+  hackathonId: string;
+  organizer: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  blockNumber: string;
+};
+
+function toAnchor(a: GqlAnchor): AnchorEvent {
+  return {
+    builder: a.builder as Address,
+    repoId: a.repoId as Hex,
+    commitHash: a.commitHash as Hex,
+    label: a.label,
+    timestamp: Number(a.timestamp),
+    txHash: a.txHash as Hex,
+    blockNumber: BigInt(a.blockNumber),
+  };
+}
+function toProject(p: GqlProject): ProjectRegisteredEvent {
+  return {
+    builder: p.builder as Address,
+    repoId: p.repoId as Hex,
+    hackathonId: p.hackathonId as Hex,
+    repoUrl: p.repoUrl,
+    registeredAt: Number(p.registeredAt),
+    txHash: p.txHash as Hex,
+    blockNumber: BigInt(p.blockNumber),
+  };
+}
+
 // Adaptive range scanning: try the full requested range in one call first, and
 // only split into smaller windows when the RPC actually rejects it. This is
 // near-instant on a provider that can span huge ranges in one shot when scoped
@@ -296,6 +369,19 @@ export async function fetchAnchorsForRepo(repoId: Hex): Promise<AnchorEvent[]> {
   if (ADDRESSES.registry === "0x0000000000000000000000000000000000000000") {
     return [];
   }
+  if (INDEXER_URL) {
+    return cached(`anchors:${repoId}`, async () => {
+      const data = await gql<{ Anchor: GqlAnchor[] }>(
+        `query($repoId: String!) {
+          Anchor(where: { repoId: { _eq: $repoId } }, order_by: { timestamp: asc }) {
+            builder repoId commitHash label timestamp txHash blockNumber
+          }
+        }`,
+        { repoId: repoId.toLowerCase() }
+      );
+      return data.Anchor.map(toAnchor);
+    });
+  }
   if (inBrowser) {
     return cached(`anchors:${repoId}`, () => viaScanApi<AnchorEvent>({ kind: "anchors", repoId }));
   }
@@ -327,6 +413,26 @@ export type HackathonListing = RepoWindow & {
 export async function fetchAllWindows(): Promise<HackathonListing[]> {
   if (ADDRESSES.hackathonRegistry === "0x0000000000000000000000000000000000000000") {
     return [];
+  }
+  if (INDEXER_URL) {
+    return cached("all-windows", async () => {
+      const data = await gql<{ HackathonWindow: GqlWindow[] }>(
+        `query {
+          HackathonWindow(order_by: { startTime: asc }) {
+            hackathonId organizer name startTime endTime blockNumber
+          }
+        }`,
+        {}
+      );
+      return data.HackathonWindow.map((w) => ({
+        hackathonId: w.hackathonId as Hex,
+        name: w.name,
+        startTime: Number(w.startTime),
+        endTime: Number(w.endTime),
+        organizer: w.organizer as Address,
+        blockNumber: BigInt(w.blockNumber),
+      }));
+    });
   }
   if (inBrowser) {
     return cached("all-windows", () => viaScanApi<HackathonListing>({ kind: "windows" }));
@@ -386,6 +492,19 @@ export async function fetchProjectsForHackathon(
   if (ADDRESSES.registry === "0x0000000000000000000000000000000000000000") {
     return [];
   }
+  if (INDEXER_URL) {
+    return cached(`projects:${hackathonId}`, async () => {
+      const data = await gql<{ Project: GqlProject[] }>(
+        `query($h: String!) {
+          Project(where: { hackathonId: { _eq: $h } }, order_by: { registeredAt: asc }) {
+            builder repoId hackathonId repoUrl registeredAt txHash blockNumber
+          }
+        }`,
+        { h: hackathonId.toLowerCase() }
+      );
+      return data.Project.map(toProject);
+    });
+  }
   if (inBrowser) {
     return cached(`projects:${hackathonId}`, () =>
       viaScanApi<ProjectRegisteredEvent>({ kind: "projects", hackathonId })
@@ -414,6 +533,19 @@ export async function fetchProjectsForHackathon(
 export async function fetchProjectsByOwner(owner: Address): Promise<ProjectRegisteredEvent[]> {
   if (ADDRESSES.registry === "0x0000000000000000000000000000000000000000") {
     return [];
+  }
+  if (INDEXER_URL) {
+    return cached(`owner:${owner.toLowerCase()}`, async () => {
+      const data = await gql<{ Project: GqlProject[] }>(
+        `query($b: String!) {
+          Project(where: { builder: { _eq: $b } }, order_by: { registeredAt: asc }) {
+            builder repoId hackathonId repoUrl registeredAt txHash blockNumber
+          }
+        }`,
+        { b: owner.toLowerCase() }
+      );
+      return data.Project.map(toProject);
+    });
   }
   if (inBrowser) {
     return cached(`owner:${owner.toLowerCase()}`, () =>

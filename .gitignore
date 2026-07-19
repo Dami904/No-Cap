@@ -87,3 +87,6 @@ agent/
 
 .vercel
 .env*
+
+# Large installers / binaries — never commit
+*.exe
