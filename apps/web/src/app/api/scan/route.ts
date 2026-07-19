@@ -54,9 +54,11 @@ export async function GET(req: Request) {
       headers: { "content-type": "application/json", "cache-control": CACHE_CONTROL },
     });
   } catch (e) {
+    // Never let an error response get edge-cached — the next request must be
+    // free to retry immediately rather than serve a cached failure for 15s.
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "scan failed" },
-      { status: 502 }
+      { status: 502, headers: { "cache-control": "no-store" } }
     );
   }
 }
