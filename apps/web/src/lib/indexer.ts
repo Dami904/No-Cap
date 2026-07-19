@@ -145,6 +145,24 @@ async function getLogsChunked(params: {
   return allLogs;
 }
 
+/** In the browser, every scan goes through /api/scan instead of the scan RPC:
+ *  the provider token must never ship in the client bundle, and the API route's
+ *  edge caching shares one scan result across all concurrent visitors. Server
+ *  code (the API route itself, report route, SSR) falls through to direct
+ *  scanning below. */
+const inBrowser = typeof window !== "undefined";
+
+async function viaScanApi<T extends { blockNumber?: unknown }>(
+  params: Record<string, string>
+): Promise<T[]> {
+  const res = await fetch(`/api/scan?${new URLSearchParams(params)}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? `scan api ${res.status}`);
+  return (data as T[]).map((it) =>
+    typeof it.blockNumber === "string" ? { ...it, blockNumber: BigInt(it.blockNumber) } : it
+  );
+}
+
 /** The scan endpoint's OWN view of the chain tip — never the main RPC's.
  *  The two endpoints track the tip independently and drift a few blocks apart
  *  in either direction (measured live: −8 to 0). Passing the main RPC's tip as
@@ -246,6 +264,9 @@ export async function fetchAnchorsForRepo(repoId: Hex): Promise<AnchorEvent[]> {
   if (ADDRESSES.registry === "0x0000000000000000000000000000000000000000") {
     return [];
   }
+  if (inBrowser) {
+    return cached(`anchors:${repoId}`, () => viaScanApi<AnchorEvent>({ kind: "anchors", repoId }));
+  }
   return cached(`anchors:${repoId}`, async () => {
     const latest = await getScanTip();
     const fromBlock = ADDRESSES.deploymentBlock > 0n ? ADDRESSES.deploymentBlock : 0n;
@@ -274,6 +295,9 @@ export type HackathonListing = RepoWindow & {
 export async function fetchAllWindows(): Promise<HackathonListing[]> {
   if (ADDRESSES.hackathonRegistry === "0x0000000000000000000000000000000000000000") {
     return [];
+  }
+  if (inBrowser) {
+    return cached("all-windows", () => viaScanApi<HackathonListing>({ kind: "windows" }));
   }
   return cached("all-windows", async () => {
     const latest = await getScanTip();
@@ -330,6 +354,11 @@ export async function fetchProjectsForHackathon(
   if (ADDRESSES.registry === "0x0000000000000000000000000000000000000000") {
     return [];
   }
+  if (inBrowser) {
+    return cached(`projects:${hackathonId}`, () =>
+      viaScanApi<ProjectRegisteredEvent>({ kind: "projects", hackathonId })
+    );
+  }
   return cached(`projects:${hackathonId}`, async () => {
     const latest = await getScanTip();
     const fromBlock = ADDRESSES.deploymentBlock > 0n ? ADDRESSES.deploymentBlock : 0n;
@@ -353,6 +382,11 @@ export async function fetchProjectsForHackathon(
 export async function fetchProjectsByOwner(owner: Address): Promise<ProjectRegisteredEvent[]> {
   if (ADDRESSES.registry === "0x0000000000000000000000000000000000000000") {
     return [];
+  }
+  if (inBrowser) {
+    return cached(`owner:${owner.toLowerCase()}`, () =>
+      viaScanApi<ProjectRegisteredEvent>({ kind: "owner", owner })
+    );
   }
   return cached(`owner:${owner.toLowerCase()}`, async () => {
     const latest = await getScanTip();

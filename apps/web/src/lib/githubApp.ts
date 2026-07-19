@@ -1,5 +1,5 @@
 import "server-only";
-import { createSign } from "node:crypto";
+import { createHmac, createSign, timingSafeEqual } from "node:crypto";
 
 /**
  * Server-only: authenticates as the NoCap GitHub App (not a user) to look up which
@@ -7,6 +7,37 @@ import { createSign } from "node:crypto";
  * list instead of free-text — GitHub only lets an app see repos its installer
  * actually administers, which is what makes registration a real ownership proof.
  */
+
+/**
+ * Stateless session cookie: `${installationId}.${hmac}`. The installation id is
+ * signed with a server-only secret rather than stored server-side because this
+ * runs on serverless — an in-memory session map is wiped on every cold start and
+ * isn't shared between instances, which surfaced as "reconnect GitHub every
+ * visit." The id itself isn't secret (it's just a pointer; all API access still
+ * goes through the App's own credentials) — the signature only stops a visitor
+ * from forging a cookie that points at someone else's installation.
+ */
+export function signInstallationCookie(installationId: number): string {
+  const secret = process.env.GITHUB_WEBHOOK_SECRET;
+  if (!secret) throw new Error("GITHUB_WEBHOOK_SECRET not set");
+  const mac = createHmac("sha256", secret).update(String(installationId)).digest("hex");
+  return `${installationId}.${mac}`;
+}
+
+export function verifyInstallationCookie(value: string | undefined): number | null {
+  if (!value) return null;
+  const secret = process.env.GITHUB_WEBHOOK_SECRET;
+  if (!secret) return null;
+  const dot = value.indexOf(".");
+  if (dot <= 0) return null;
+  const idPart = value.slice(0, dot);
+  const macPart = value.slice(dot + 1);
+  const expected = createHmac("sha256", secret).update(idPart).digest("hex");
+  if (macPart.length !== expected.length) return null;
+  if (!timingSafeEqual(Buffer.from(macPart), Buffer.from(expected))) return null;
+  const id = Number(idPart);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
 
 function base64url(input: Buffer | string): string {
   return Buffer.from(input)

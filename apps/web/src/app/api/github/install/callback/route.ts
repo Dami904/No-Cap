@@ -1,7 +1,6 @@
 import "server-only";
 import { NextResponse } from "next/server";
-import { randomBytes } from "node:crypto";
-import { getInstallationStore } from "@/lib/installationStore";
+import { signInstallationCookie } from "@/lib/githubApp";
 
 export const runtime = "nodejs";
 
@@ -21,11 +20,8 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL("/register?gh=pending", url.origin));
   }
 
-  const sessionToken = randomBytes(24).toString("hex");
-  await getInstallationStore().saveInstallation(sessionToken, Number(installationId));
-
   const res = NextResponse.redirect(new URL("/register?gh=connected", url.origin));
-  res.cookies.set("nocap_gh_session", sessionToken, {
+  res.cookies.set("nocap_gh_session", signInstallationCookie(Number(installationId)), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

@@ -11,16 +11,21 @@ export function getPublicClient() {
   });
 }
 
-/** Dedicated client for eth_getLogs scans. Prefers NEXT_PUBLIC_SCAN_RPC_URL (e.g.
- *  Envio's HyperRPC — verified to scan this app's entire chain history in ~200ms
- *  vs. tens of seconds on the public RPC's 100-block eth_getLogs cap) when set,
- *  falling back to the main RPC otherwise. This client is ONLY ever used for
- *  getLogs — a HyperRPC-style endpoint doesn't implement eth_call, eth_estimateGas,
- *  or eth_sendRawTransaction, so it must never back contract reads or wallet writes.
- *  No request batching (some RPCs choke on large batches of concurrent getLogs)
- *  and a low retry count so transient throttles fail fast instead of stacking backoff. */
+/** Dedicated client for eth_getLogs scans. Prefers SCAN_RPC_URL (e.g. Envio's
+ *  HyperRPC — verified to scan this app's entire chain history in ~200ms vs.
+ *  tens of seconds on the public RPC's 100-block eth_getLogs cap) when set,
+ *  falling back to the main RPC otherwise. SCAN_RPC_URL is deliberately NOT
+ *  NEXT_PUBLIC_: the URL embeds the provider token, and a NEXT_PUBLIC_ var gets
+ *  inlined into the public JS bundle where anyone (including every stale open
+ *  tab) can extract it and drain the shared per-minute quota — which took the
+ *  site down in practice. Server-only now; browsers scan via /api/scan. This
+ *  client is ONLY ever used for getLogs — a HyperRPC-style endpoint doesn't
+ *  implement eth_call, eth_estimateGas, or eth_sendRawTransaction, so it must
+ *  never back contract reads or wallet writes. No request batching (some RPCs
+ *  choke on large batches of concurrent getLogs) and a low retry count so
+ *  transient throttles fail fast instead of stacking backoff. */
 export function getScanClient() {
-  const scanRpc = process.env.NEXT_PUBLIC_SCAN_RPC_URL || monadTestnet.rpcUrls.default.http[0];
+  const scanRpc = process.env.SCAN_RPC_URL || monadTestnet.rpcUrls.default.http[0];
   return createPublicClient({
     chain: monadTestnet,
     transport: http(scanRpc, {

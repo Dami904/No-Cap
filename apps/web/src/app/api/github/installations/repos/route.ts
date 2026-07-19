@@ -1,8 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getInstallationStore } from "@/lib/installationStore";
-import { listInstallationRepos } from "@/lib/githubApp";
+import { listInstallationRepos, verifyInstallationCookie } from "@/lib/githubApp";
 
 export const runtime = "nodejs";
 
@@ -10,12 +9,9 @@ export const runtime = "nodejs";
  *  /register picker. No installation cookie = not connected yet, not an error. */
 export async function GET() {
   const cookieStore = await cookies();
-  const sessionToken = cookieStore.get("nocap_gh_session")?.value;
-  if (!sessionToken) {
-    return NextResponse.json({ connected: false, repos: [] });
-  }
-
-  const installationId = await getInstallationStore().getInstallation(sessionToken);
+  const installationId = verifyInstallationCookie(
+    cookieStore.get("nocap_gh_session")?.value
+  );
   if (!installationId) {
     return NextResponse.json({ connected: false, repos: [] });
   }
