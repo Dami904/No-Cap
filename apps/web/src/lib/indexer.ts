@@ -59,6 +59,11 @@ function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
 // meant hundreds of thousands of concurrent requests fired at once).
 const PARALLEL = 5;
 const MAX_RETRIES = 3;
+// 429s get more patience than range errors (5 attempts, longer backoff) precisely
+// because they must NEVER fall through to splitting — see the isRateLimit branch
+// below. Worst case ~15.5s of backoff on one stubborn range beats silently
+// dropping that range's logs.
+const MAX_RATE_LIMIT_RETRIES = 5;
 
 async function getLogsOne(
   params: {
@@ -80,11 +85,25 @@ async function getLogsOne(
       toBlock: to,
     })) as Log[];
     return { logs };
-  } catch {
-    if (attempt < MAX_RETRIES) {
-      await new Promise((r) => setTimeout(r, 250 * 2 ** attempt));
+  } catch (err) {
+    // A 429 is a property of the caller/endpoint over time, not of this
+    // range — confirmed via direct testing: a plain retry-then-split treats
+    // a sustained rate limit exactly like a range-too-large error, so it
+    // keeps bisecting a 200k+ block range across dozens of recursion levels
+    // while every leaf still gets 429'd, an exponential blowup that can run
+    // for hours instead of seconds. Range-too-large errors come back as
+    // 413/-32614 (confirmed against Monad's public RPC); rate limits come
+    // back as 429 (confirmed against Envio's HyperRPC) — that status code is
+    // the only reliable way to tell them apart, so branch on it explicitly
+    // instead of treating every failure the same.
+    const isRateLimit = (err as { status?: number })?.status === 429;
+    const maxRetries = isRateLimit ? MAX_RATE_LIMIT_RETRIES : MAX_RETRIES;
+    if (attempt < maxRetries) {
+      const base = isRateLimit ? 500 : 250;
+      await new Promise((r) => setTimeout(r, base * 2 ** attempt));
       return getLogsOne(params, from, to, attempt + 1);
     }
+    if (isRateLimit) return { logs: [] };
     if (to > from) {
       const mid = from + (to - from) / 2n;
       return { logs: [], splitInto: [[from, mid], [mid + 1n, to]] };
@@ -124,6 +143,45 @@ async function getLogsChunked(params: {
     if (inFlight.size > 0) await Promise.race(inFlight);
   }
   return allLogs;
+}
+
+/** The scan endpoint's OWN view of the chain tip — never the main RPC's.
+ *  The two endpoints track the tip independently and drift a few blocks apart
+ *  in either direction (measured live: −8 to 0). Passing the main RPC's tip as
+ *  toBlock when it's ahead of the scan endpoint's makes the scan endpoint
+ *  reject with "requested block X is greater than latest block Y" — which isn't
+ *  a 429 and isn't a range-cap error, so the adaptive scanner bisected the
+ *  whole history ~18 levels deep with retries at every level (~20–40s per list
+ *  row) on roughly every page load where the tips were misaligned. Asking the
+ *  scan endpoint for its own tip makes the toBlock valid by construction. */
+async function getScanTip(): Promise<bigint> {
+  return getScanClient().getBlockNumber();
+}
+
+/** Runs `fn` over `items` with at most `limit` in flight at once, preserving
+ *  input order in the result. Callers that scan onchain data per-item (e.g. one
+ *  fetchAnchorsForRepo call per project in a list) must not `await` in a plain
+ *  for-loop — that serializes N independent RPC round trips instead of
+ *  overlapping them, which is the dominant cost on any list with more than one
+ *  row. Bounded rather than a bare Promise.all because each item here may itself
+ *  fan out to PARALLEL sub-requests inside getLogsChunked, so unbounded outer
+ *  concurrency would multiply against that and risk the same 429 storm this
+ *  file already guards against at the block-range level. */
+export async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]!);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }
 
 function decodeAnchored(log: Log): AnchorEvent | null {
@@ -189,8 +247,7 @@ export async function fetchAnchorsForRepo(repoId: Hex): Promise<AnchorEvent[]> {
     return [];
   }
   return cached(`anchors:${repoId}`, async () => {
-    const client = getPublicClient();
-    const latest = await client.getBlockNumber();
+    const latest = await getScanTip();
     const fromBlock = ADDRESSES.deploymentBlock > 0n ? ADDRESSES.deploymentBlock : 0n;
     const event = noCapRegistryAbi.find((x) => x.type === "event" && x.name === "Anchored")!;
     const logs = await getLogsChunked({
@@ -219,8 +276,7 @@ export async function fetchAllWindows(): Promise<HackathonListing[]> {
     return [];
   }
   return cached("all-windows", async () => {
-    const client = getPublicClient();
-    const latest = await client.getBlockNumber();
+    const latest = await getScanTip();
     const fromBlock =
       ADDRESSES.hackathonDeploymentBlock > 0n ? ADDRESSES.hackathonDeploymentBlock : 0n;
     const event = hackathonRegistryAbi.find(
@@ -275,8 +331,7 @@ export async function fetchProjectsForHackathon(
     return [];
   }
   return cached(`projects:${hackathonId}`, async () => {
-    const client = getPublicClient();
-    const latest = await client.getBlockNumber();
+    const latest = await getScanTip();
     const fromBlock = ADDRESSES.deploymentBlock > 0n ? ADDRESSES.deploymentBlock : 0n;
     const event = noCapRegistryAbi.find(
       (x) => x.type === "event" && x.name === "ProjectRegistered"
@@ -300,8 +355,7 @@ export async function fetchProjectsByOwner(owner: Address): Promise<ProjectRegis
     return [];
   }
   return cached(`owner:${owner.toLowerCase()}`, async () => {
-    const client = getPublicClient();
-    const latest = await client.getBlockNumber();
+    const latest = await getScanTip();
     const fromBlock = ADDRESSES.deploymentBlock > 0n ? ADDRESSES.deploymentBlock : 0n;
     const event = noCapRegistryAbi.find(
       (x) => x.type === "event" && x.name === "ProjectRegistered"

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAccount } from "wagmi";
 import type { AnchorEvent, ProjectRegisteredEvent } from "@nocap/shared";
 import { activeDayStreak } from "@nocap/shared";
-import { fetchProjectsByOwner, fetchAnchorsForRepo } from "@/lib/indexer";
+import { fetchProjectsByOwner, fetchAnchorsForRepo, mapLimit } from "@/lib/indexer";
 import { VelocityChart } from "@/components/VelocityChart";
 import { ConnectButton } from "@/components/ConnectButton";
 import { formatTs, shorten } from "@/lib/format";
@@ -28,11 +28,10 @@ export default function DashboardPage() {
         setLoading(true);
         setError(null);
         const projects = await fetchProjectsByOwner(address);
-        const withAnchors: ProjectRow[] = [];
-        for (const p of projects) {
-          const anchors = await fetchAnchorsForRepo(p.repoId);
-          withAnchors.push({ ...p, anchors });
-        }
+        const withAnchors = await mapLimit(projects, 4, async (p) => ({
+          ...p,
+          anchors: await fetchAnchorsForRepo(p.repoId),
+        }));
         if (!cancelled) setRows(withAnchors);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");

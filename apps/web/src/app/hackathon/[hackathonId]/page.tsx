@@ -13,6 +13,7 @@ import {
   fetchProjectsForHackathon,
   fetchAnchorsForRepo,
   getWindowById,
+  mapLimit,
   type RepoWindow,
 } from "@/lib/indexer";
 import { DEFAULT_HACKATHON } from "@/lib/config";
@@ -88,8 +89,7 @@ export default function HackathonBoardPage({
           getWindowById(hackathonId).catch(() => null),
         ]);
         if (cancelled) return;
-        const built: Row[] = [];
-        for (const p of projects) {
+        const built = await mapLimit(projects, 4, async (p) => {
           const anchors = await fetchAnchorsForRepo(p.repoId);
           const firstTs = anchors[0]?.timestamp;
           const lastTs = anchors[anchors.length - 1]?.timestamp;
@@ -99,8 +99,8 @@ export default function HackathonBoardPage({
                 endTime: window.endTime,
               }).ok
             : undefined;
-          built.push({ ...p, anchors, firstTs, ok });
-        }
+          return { ...p, anchors, firstTs, ok };
+        });
         if (!cancelled) setRows(built);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");

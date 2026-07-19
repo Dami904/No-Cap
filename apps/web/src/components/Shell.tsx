@@ -81,7 +81,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <div>
             <h4>Trust model</h4>
             <ul>
-              <li>CI attestation via per-repo burner keys</li>
+              <li>Anchored by a hosted relayer, opt-in per repo</li>
               <li>Timing proofs only — never code content</li>
               <li>Anomalies surfaced, never auto-DQ&apos;d</li>
             </ul>
