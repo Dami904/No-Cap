@@ -1,7 +1,9 @@
-import { NoCapRegistry } from "generated";
-import type { Anchor, Project } from "generated";
+import { indexer, NoCapRegistry } from "envio";
+import type { Anchor, Project } from "envio";
 
-NoCapRegistry.Anchored.handler(async ({ event, context }) => {
+indexer.onEvent(
+  { contract: "NoCapRegistry", event: "Anchored" },
+  async ({ event, context }) => {
   const entity: Anchor = {
     id: `${event.chainId}_${event.block.number}_${event.logIndex}`,
     // Lowercase every address on the way in so GraphQL _eq filters match a
@@ -15,9 +17,12 @@ NoCapRegistry.Anchored.handler(async ({ event, context }) => {
     blockNumber: BigInt(event.block.number),
   };
   context.Anchor.set(entity);
-});
+}
+);
 
-NoCapRegistry.ProjectRegistered.handler(async ({ event, context }) => {
+indexer.onEvent(
+  { contract: "NoCapRegistry", event: "ProjectRegistered" },
+  async ({ event, context }) => {
   // Keyed by repoId: registerProject reverts if the repo is already registered,
   // so there is exactly one ProjectRegistered per repo and repoId is a stable id.
   const entity: Project = {
@@ -31,4 +36,5 @@ NoCapRegistry.ProjectRegistered.handler(async ({ event, context }) => {
     blockNumber: BigInt(event.block.number),
   };
   context.Project.set(entity);
-});
+}
+);
