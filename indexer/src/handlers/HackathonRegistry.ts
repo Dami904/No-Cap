@@ -1,7 +1,9 @@
-import { HackathonRegistry } from "generated";
-import type { HackathonWindow } from "generated";
+import { indexer, HackathonRegistry } from "envio";
+import type { HackathonWindow } from "envio";
 
-HackathonRegistry.WindowRegistered.handler(async ({ event, context }) => {
+indexer.onEvent(
+  { contract: "HackathonRegistry", event: "WindowRegistered" },
+  async ({ event, context }) => {
   // Keyed by hackathonId and upserted: a window can be re-registered to update
   // its times, so keep the latest by block number (events replay in order, so a
   // later event always has a >= block — but guard explicitly for reorgs).
@@ -19,4 +21,5 @@ HackathonRegistry.WindowRegistered.handler(async ({ event, context }) => {
     blockNumber: BigInt(event.block.number),
   };
   context.HackathonWindow.set(entity);
-});
+}
+);

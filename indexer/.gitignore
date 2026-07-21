@@ -35,3 +35,4 @@ logs
 build
 .env
 .pnpm-store
+.envio/
